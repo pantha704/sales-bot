@@ -463,23 +463,26 @@ export function RoleplayStudio() {
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[19rem_minmax(0,1fr)]">
-      <aside className="space-y-5">
-        <Card className="border-border/80 bg-card/75 shadow-none backdrop-blur">
-          <CardHeader className="border-b">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium tracking-widest text-primary uppercase">
+    <div className="grid gap-5 lg:grid-cols-[20.5rem_minmax(0,1fr)]">
+      <aside className="space-y-4 lg:sticky lg:top-5 lg:self-start">
+        <Card className="overflow-hidden border-border/80 bg-card/75 shadow-none backdrop-blur">
+          <CardHeader className="border-b border-border/70 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[0.68rem] font-medium tracking-[0.14em] text-primary uppercase">
                   Buyer setup
                 </p>
-                <CardTitle className="mt-1 text-lg">Choose a persona</CardTitle>
+                <CardTitle className="mt-1 text-base">Choose a persona</CardTitle>
               </div>
-              <Badge variant="outline" className="capitalize">
+              <Badge
+                variant="outline"
+                className="shrink-0 capitalize text-muted-foreground"
+              >
                 {persona.difficulty}
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 pt-4">
             {personaPresets.map((preset) => {
               const active = preset.id === persona.id;
 
@@ -492,8 +495,8 @@ export function RoleplayStudio() {
                   className={cn(
                     "group flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                     active
-                      ? "border-primary/40 bg-primary/10"
-                      : "border-transparent bg-muted/35 hover:border-border hover:bg-muted/60",
+                      ? "border-primary/40 bg-primary/10 shadow-[inset_0_0_0_1px_rgba(0,0,0,0.02)]"
+                      : "border-border/50 bg-background/30 hover:border-border hover:bg-muted/40",
                   )}
                   aria-pressed={active}
                 >
@@ -502,7 +505,7 @@ export function RoleplayStudio() {
                       "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold",
                       active
                         ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-secondary-foreground",
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     {preset.name
@@ -511,17 +514,20 @@ export function RoleplayStudio() {
                       .join("")}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 font-medium">
-                      {preset.name}
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <span className="truncate">{preset.name}</span>
                       {active ? (
                         <Check
-                          className="size-3.5 text-primary"
+                          className="size-3.5 shrink-0 text-primary"
                           aria-hidden="true"
                         />
                       ) : null}
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                      {preset.buyerRole} · {preset.company}
+                    <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                      {preset.buyerRole}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-muted-foreground/80">
+                      {preset.company} · {preset.industry}
                     </span>
                   </span>
                 </button>
@@ -530,35 +536,53 @@ export function RoleplayStudio() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 bg-card/55 shadow-none">
-          <CardHeader>
-            <CardTitle className="text-sm">What matters to {persona.name}</CardTitle>
+        <Card className="border-border/80 bg-card/60 shadow-none backdrop-blur">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium leading-snug">
+              What matters to {persona.name}
+            </CardTitle>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {persona.personality}
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4 text-xs leading-5">
+          <CardContent className="space-y-4 text-sm">
             <div>
-              <p className="font-medium text-foreground">Business goals</p>
-              <ul className="mt-1.5 space-y-1 text-muted-foreground">
+              <p className="text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
+                Business goals
+              </p>
+              <ul className="mt-2 space-y-2">
                 {persona.goals.map((goal) => (
-                  <li key={goal} className="flex gap-2">
-                    <span className="text-primary">•</span>
-                    <span>{goal}</span>
+                  <li
+                    key={goal}
+                    className="flex gap-2.5 text-xs leading-5 text-foreground/90"
+                  >
+                    <span
+                      className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary/70"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0">{goal}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            <div>
-              <p className="font-medium text-foreground">Likely objections</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="border-t border-border/60 pt-4">
+              <p className="text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
+                Likely objections
+              </p>
+              <ul className="mt-2 space-y-2">
                 {persona.concerns.map((concern) => (
-                  <Badge
+                  <li
                     key={concern}
-                    variant="secondary"
-                    className="whitespace-normal text-left font-normal"
+                    className="flex gap-2.5 text-xs leading-5 text-foreground/90"
                   >
-                    {concern}
-                  </Badge>
+                    <span
+                      className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-400/70"
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0">{concern}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </CardContent>
         </Card>

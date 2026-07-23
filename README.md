@@ -4,11 +4,15 @@ CloseLoop is a configurable voice roleplay and lead-profiling system built for
 the Eubrics Automation Engineer assignment.
 
 - **Part 1:** speak or type to a realistic AI buyer, switch buyer
-  configurations, hear the response, and download the transcript.
+  configurations, hear the response, download the transcript, and optionally
+  score the call against a transparent discovery rubric.
 - **Part 2:** submit visitor details and simulated page history to an n8n
   workflow that classifies, stores, and emails the lead.
 - **Part 3:** a sanitized case study of an existing monday.com and Outlook
   operations automation.
+
+**Live demo:** [https://sales-bot-sooty.vercel.app](https://sales-bot-sooty.vercel.app)  
+**Repo:** [https://github.com/pantha704/sales-bot](https://github.com/pantha704/sales-bot)
 
 The web app deliberately works without credentials. It labels deterministic
 local results as `Demo mode`, while configured providers are labelled `Live AI`
@@ -84,15 +88,25 @@ used (fine for local demo, weaker on multi-instance production).
 ```text
 src/app/roleplay/                 Sales roleplay interface
 src/app/lead-profiler/            Lead intake interface
-src/app/api/roleplay/             Conversation, STT, and TTS routes
+src/app/api/roleplay/             Conversation, STT, TTS, and score routes
 src/app/api/leads/                Validated n8n gateway
-src/features/roleplay/            Personas, prompting, fallbacks, recording
+src/features/roleplay/            Personas, prompting, scoring, recording
+src/features/roleplay/scoring/    Rubric, mock/live coach scorers
 src/features/leads/               Lead schemas and demo classifier
 workflows/lead-profiler.json      Importable main n8n workflow
 workflows/lead-profiler-error-handler.json
 workflows/google-sheet-template.csv
 docs/                             Setup, decisions, interview, and demo notes
 ```
+
+### Roleplay scoring
+
+After at least two seller turns, use **Score this call** in the studio header
+(clipboard icon). Scoring is a separate coach path (not the buyer persona):
+
+- Five weighted dimensions: discovery, objections, value, structure, next steps
+- Live Groq coach when `GROQ_API_KEY` is set; deterministic demo score otherwise
+- Score card appears under the transcript and is appended to downloads
 
 ## Assignment setup
 
@@ -125,8 +139,10 @@ CI runs the same four checks on pushes and pull requests.
 - Groq Orpheus is a secondary TTS provider and the adapter conservatively limits
   input to 200 characters. Browser `speechSynthesis` is the final no-key
   fallback and sounds different across devices.
-- Transcripts remain in the browser session and are downloaded explicitly; no
-  database is needed for this assignment.
+- Transcripts and call scores remain in the browser session and are downloaded
+  explicitly; no database is needed for this assignment.
+- Post-call scoring is on-demand so the buyer stays in character during the
+  conversation; the coach model (or mock rubric) runs only when requested.
 - An n8n Cloud trial is sufficient for the deadline, but its production webhook
   stops when the trial/workspace stops. The exported workflows keep the
   automation portable.
