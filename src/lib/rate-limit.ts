@@ -12,6 +12,7 @@ export type RateLimitBucket =
   | "roleplay-respond"
   | "roleplay-speech"
   | "roleplay-transcribe"
+  | "roleplay-score"
   | "leads";
 
 const BUCKET_CONFIG: Record<
@@ -21,6 +22,7 @@ const BUCKET_CONFIG: Record<
   "roleplay-respond": { requests: 30, window: "1 m" },
   "roleplay-speech": { requests: 30, window: "1 m" },
   "roleplay-transcribe": { requests: 15, window: "1 m" },
+  "roleplay-score": { requests: 10, window: "1 m" },
   leads: { requests: 10, window: "1 m" },
 };
 

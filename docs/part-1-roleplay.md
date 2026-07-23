@@ -110,10 +110,20 @@ returned to the browser.
 6. Remove the Groq key. Confirm clearly labelled demo-mode buyer responses.
 7. Download the transcript and verify both speakers are readable.
 
+## Post-call scoring
+
+Scoring is a **separate coach step**, not part of the buyer persona.
+
+- UI: clipboard button in the roleplay studio (needs ≥2 seller turns)
+- API: `POST /api/roleplay/score`
+- Rubric: discovery, objections, value, structure, next steps (`scoring/rubric.ts`)
+- Live path: Groq JSON coach when `GROQ_API_KEY` is set
+- Demo path: deterministic heuristics without keys
+- Transcript download appends the score block when present
+
 ## Known next steps
 
 - Full-duplex WebRTC and barge-in
 - Streaming partial STT and TTS
-- Optional post-call scoring against a transparent rubric
 - Session persistence with retention controls
 - Latency, provider-error, and conversation-quality telemetry

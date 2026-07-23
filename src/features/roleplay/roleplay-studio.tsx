@@ -5,6 +5,7 @@ import {
   AlertCircle,
   Bot,
   Check,
+  ClipboardCheck,
   Download,
   LoaderCircle,
   Mic,
@@ -36,6 +37,11 @@ import {
   type Persona,
   type RoleplayMessage,
 } from "@/features/roleplay/schemas";
+import { MIN_SELLER_TURNS_TO_SCORE } from "@/features/roleplay/scoring/rubric";
+import {
+  scoreResponseSchema,
+  type ScoreResponse,
+} from "@/features/roleplay/scoring/schemas";
 import { useAudioRecorder } from "@/features/roleplay/use-audio-recorder";
 import { cn } from "@/lib/utils";
 
@@ -101,12 +107,20 @@ export function RoleplayStudio() {
   );
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [score, setScore] = useState<ScoreResponse | null>(null);
+  const [isScoring, setIsScoring] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const recorder = useAudioRecorder();
+  const sellerTurnCount = messages.filter(
+    (message) => message.role === "seller",
+  ).length;
+  const canScore =
+    sellerTurnCount >= MIN_SELLER_TURNS_TO_SCORE && !isScoring && !recorder.isRecording;
   const isBusy =
     activity !== "ready" ||
+    isScoring ||
     recorder.status === "requesting" ||
     recorder.status === "stopping";
 
@@ -144,6 +158,8 @@ export function RoleplayStudio() {
     setNotice(null);
     setResponseMode(null);
     setVoiceProvider(null);
+    setScore(null);
+    setIsScoring(false);
     setActivity("ready");
     recorder.clearError();
   }
@@ -353,6 +369,26 @@ export function RoleplayStudio() {
   }
 
   function downloadTranscript() {
+    const scoreBlock = score
+      ? [
+          "",
+          "--- Call score ---",
+          `Overall: ${score.overallScore}/100 (${score.mode})`,
+          score.summary,
+          "",
+          ...score.dimensions.map(
+            (dimension) =>
+              `${dimension.label}: ${dimension.score}/10 — ${dimension.note}`,
+          ),
+          "",
+          "Strengths:",
+          ...score.strengths.map((item) => `- ${item}`),
+          "",
+          "Improvements:",
+          ...score.improvements.map((item) => `- ${item}`),
+        ]
+      : [];
+
     const transcript = [
       `CloseLoop sales roleplay`,
       `Buyer: ${persona.name}, ${persona.buyerRole} at ${persona.company}`,
@@ -362,6 +398,7 @@ export function RoleplayStudio() {
         (message) =>
           `${message.role === "buyer" ? persona.name : "Seller"}: ${message.content}`,
       ),
+      ...scoreBlock,
     ].join("\n");
     const url = URL.createObjectURL(
       new Blob([transcript], { type: "text/plain;charset=utf-8" }),
@@ -371,6 +408,58 @@ export function RoleplayStudio() {
     anchor.download = `closeloop-${persona.id}-transcript.txt`;
     anchor.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function scoreCall() {
+    if (!canScore || activity !== "ready") {
+      return;
+    }
+
+    setIsScoring(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch("/api/roleplay/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          persona,
+          messages: messages.slice(-40),
+        }),
+      });
+      const body: unknown = await response.json();
+      const parsed = scoreResponseSchema.safeParse(body);
+
+      if (!response.ok || !parsed.success) {
+        const message =
+          typeof body === "object" &&
+          body &&
+          "error" in body &&
+          typeof body.error === "string"
+            ? body.error
+            : "The call could not be scored. Please try again.";
+        throw new Error(message);
+      }
+
+      setScore(parsed.data);
+      setNotice(
+        parsed.data.fallbackReason
+          ? `${parsed.data.fallbackReason} A deterministic demo score was used instead.`
+          : parsed.data.mode === "live"
+            ? "Live coach score ready."
+            : "Demo coach score ready.",
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "The call could not be scored. Please try again.",
+      );
+    } finally {
+      setIsScoring(false);
+    }
   }
 
   return (
@@ -528,6 +617,25 @@ export function RoleplayStudio() {
                 type="button"
                 size="icon"
                 variant="ghost"
+                onClick={() => void scoreCall()}
+                disabled={!canScore || activity !== "ready"}
+                aria-label="Score this call"
+                title={
+                  sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE
+                    ? `Need ${MIN_SELLER_TURNS_TO_SCORE} seller turns to score`
+                    : "Score this call"
+                }
+              >
+                {isScoring ? (
+                  <LoaderCircle className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <ClipboardCheck aria-hidden="true" />
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
                 onClick={() => resetSession()}
                 disabled={isBusy || recorder.isRecording}
                 aria-label="Start a new session"
@@ -616,6 +724,78 @@ export function RoleplayStudio() {
               <div ref={transcriptEndRef} />
             </div>
           </div>
+
+          {score ? (
+            <div className="mx-auto w-full max-w-3xl rounded-2xl border border-border/80 bg-background/55 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium tracking-tight">
+                    Call score
+                  </p>
+                  <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                    {score.summary}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="capitalize">
+                    {score.mode === "live" ? "Live coach" : "Demo score"}
+                  </Badge>
+                  <span className="text-2xl font-semibold tabular-nums tracking-tight">
+                    {score.overallScore}
+                    <span className="text-sm font-normal text-muted-foreground">
+                      /100
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {score.dimensions.map((dimension) => (
+                  <div
+                    key={dimension.id}
+                    className="rounded-xl border border-border/70 bg-card/40 px-3 py-2.5"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium">{dimension.label}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {dimension.score}/10
+                      </span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary/80"
+                        style={{ width: `${dimension.score * 10}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                      {dimension.note}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Strengths
+                  </p>
+                  <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/90">
+                    {score.strengths.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Improvements
+                  </p>
+                  <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/90">
+                    {score.improvements.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <div className="mx-auto w-full max-w-3xl space-y-3 border-t border-border/70 pt-4">
             {error || recorder.error ? (
