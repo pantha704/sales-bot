@@ -19,9 +19,10 @@ describe("POST /api/roleplay/speech", () => {
     expect(response.status).toBe(400);
   });
 
-  it("selects the browser fallback when no cloud provider is configured", async () => {
+  it("selects the browser fallback when cloud TTS is disabled", async () => {
     vi.stubEnv("GROQ_API_KEY", "");
     vi.stubEnv("NEUPHONIC_API_KEY", "");
+    vi.stubEnv("TTS_PROVIDER", "browser");
     const response = await POST(
       new Request("http://localhost/api/roleplay/speech", {
         method: "POST",
@@ -38,3 +39,4 @@ describe("POST /api/roleplay/speech", () => {
     expect(body.fallback).toBe("browser");
   });
 });
+

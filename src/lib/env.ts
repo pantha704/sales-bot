@@ -20,12 +20,17 @@ const serverEnvSchema = z.object({
   GROQ_TTS_VOICE: z.string().min(1).default("troy"),
   NEUPHONIC_API_KEY: optionalString,
   NEUPHONIC_VOICE_ID: optionalString,
+  /** Microsoft Edge neural voice id, e.g. en-US-AriaNeural */
+  EDGE_TTS_VOICE: z.string().min(1).default("en-US-AriaNeural"),
   /**
-   * browser = free Web Speech API (client-side; speech route returns 503)
-   * neuphonic = optional free/paid Neuphonic cloud TTS
-   * groq = paid Orpheus (disabled unless explicitly selected)
+   * edge = free Microsoft Edge neural TTS (default, no API key)
+   * browser = client Web Speech API only
+   * neuphonic = optional Neuphonic cloud
+   * groq = paid Orpheus (opt-in only)
    */
-  TTS_PROVIDER: z.enum(["browser", "neuphonic", "groq"]).default("browser"),
+  TTS_PROVIDER: z
+    .enum(["browser", "edge", "neuphonic", "groq"])
+    .default("edge"),
   N8N_LEAD_WEBHOOK_URL: optionalUrl,
   N8N_WEBHOOK_SECRET: optionalString,
   UPSTASH_REDIS_REST_URL: optionalUrl,
@@ -56,6 +61,7 @@ export function getServerEnv(): ServerEnv {
     GROQ_TTS_VOICE: process.env.GROQ_TTS_VOICE,
     NEUPHONIC_API_KEY: process.env.NEUPHONIC_API_KEY,
     NEUPHONIC_VOICE_ID: process.env.NEUPHONIC_VOICE_ID,
+    EDGE_TTS_VOICE: process.env.EDGE_TTS_VOICE,
     TTS_PROVIDER: process.env.TTS_PROVIDER,
     N8N_LEAD_WEBHOOK_URL: process.env.N8N_LEAD_WEBHOOK_URL,
     N8N_WEBHOOK_SECRET: process.env.N8N_WEBHOOK_SECRET,

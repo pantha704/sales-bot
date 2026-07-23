@@ -24,9 +24,8 @@ or `n8n live`.
 flowchart TD
     browser["Next.js browser UI"] --> server["Validated server routes"]
     server --> groq["Groq: Whisper + buyer LLM"]
-    server --> tts["Neuphonic TTS"]
-    tts -. fallback .-> groq
-    groq -. fallback .-> browser
+    server --> tts["Edge neural TTS (free)"]
+    tts -. fallback .-> browser
     server --> n8n["n8n lead workflow"]
     n8n --> google["Google Sheets + Gmail"]
 ```
@@ -39,9 +38,9 @@ messages, and the roleplay has deterministic and browser-native fallbacks.
 - Next.js 16, React 19, TypeScript, Tailwind CSS, and shadcn/ui
 - Groq Whisper for speech-to-text
 - Groq-hosted Llama for the buyer conversation
-- **Free buyer voice by default:** browser Web Speech API (`TTS_PROVIDER=browser`)
-- Optional cloud TTS: Neuphonic (`TTS_PROVIDER=neuphonic` + `NEXT_PUBLIC_CLOUD_TTS=1`)
-- Groq Orpheus TTS is **paid** and not used unless you explicitly set `TTS_PROVIDER=groq`
+- **Free buyer voice by default:** Microsoft Edge neural TTS via `node-edge-tts` (no API key)
+- Browser Web Speech API as automatic fallback
+- Optional Neuphonic; Groq Orpheus is **paid** and opt-in only (`TTS_PROVIDER=groq`)
 - Zod validation at all external boundaries
 - n8n Cloud, Google Sheets, Gmail, and the Groq API
 - Vitest, ESLint, TypeScript, and a production-build CI gate
@@ -68,7 +67,8 @@ GROQ_TTS_VOICE=troy
 
 NEUPHONIC_API_KEY=
 NEUPHONIC_VOICE_ID=
-TTS_PROVIDER=browser
+TTS_PROVIDER=edge
+EDGE_TTS_VOICE=en-US-AriaNeural
 
 # Both required for live leads (secret is fail-closed when URL is set).
 N8N_LEAD_WEBHOOK_URL=

@@ -52,7 +52,7 @@ type Activity =
   | "thinking"
   | "speaking";
 
-type VoiceProvider = "neuphonic" | "groq" | "browser" | null;
+type VoiceProvider = "edge" | "neuphonic" | "groq" | "browser" | null;
 
 const openings: Record<string, string> = {
   "maya-security":
@@ -276,13 +276,13 @@ export function RoleplayStudio() {
 
     setActivity("speaking");
 
-    // Free default: browser Web Speech API (no paid Orpheus).
-    // Optional cloud: set NEXT_PUBLIC_CLOUD_TTS=1 and TTS_PROVIDER=neuphonic.
-    const preferCloud =
-      process.env.NEXT_PUBLIC_CLOUD_TTS === "1" ||
-      process.env.NEXT_PUBLIC_CLOUD_TTS === "true";
+    // Prefer free server TTS (Edge neural voices). Browser is the fallback.
+    // Force browser-only with NEXT_PUBLIC_CLOUD_TTS=0.
+    const forceBrowser =
+      process.env.NEXT_PUBLIC_CLOUD_TTS === "0" ||
+      process.env.NEXT_PUBLIC_CLOUD_TTS === "false";
 
-    if (!preferCloud) {
+    if (forceBrowser) {
       speakWithBrowser(text);
       return;
     }
@@ -300,7 +300,7 @@ export function RoleplayStudio() {
       }
 
       const blob = await response.blob();
-      // Empty / header-only WAVs were previously returned as "success" and played silence.
+      // Empty / header-only payloads were previously returned as "success" and played silence.
       if (blob.size < 512) {
         speakWithBrowser(text);
         return;
@@ -312,10 +312,13 @@ export function RoleplayStudio() {
       stopPlayback();
       audioRef.current = audio;
       audioUrlRef.current = url;
+      const headerProvider = response.headers.get("X-TTS-Provider");
       setVoiceProvider(
-        response.headers.get("X-TTS-Provider") === "groq"
-          ? "groq"
-          : "neuphonic",
+        headerProvider === "groq" ||
+          headerProvider === "neuphonic" ||
+          headerProvider === "edge"
+          ? headerProvider
+          : "edge",
       );
       audio.onended = () => {
         stopPlayback();

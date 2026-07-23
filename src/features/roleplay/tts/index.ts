@@ -1,5 +1,6 @@
 import "server-only";
 
+import { synthesizeWithEdge } from "@/features/roleplay/tts/edge";
 import { synthesizeWithGroq } from "@/features/roleplay/tts/groq";
 import { synthesizeWithNeuphonic } from "@/features/roleplay/tts/neuphonic";
 import type {
@@ -16,17 +17,20 @@ export class TtsUnavailableError extends Error {
   }
 }
 
-function providerOrder(
-  preferred: "browser" | "neuphonic" | "groq",
-): TtsProviderName[] {
-  // Default free path: no paid Orpheus. Groq TTS only when explicitly chosen.
+type PreferredTts = "browser" | "edge" | "neuphonic" | "groq";
+
+function providerOrder(preferred: PreferredTts): TtsProviderName[] {
+  // Free Edge first by default. Paid Orpheus only when explicitly selected.
   if (preferred === "browser") {
     return [];
   }
-  if (preferred === "neuphonic") {
-    return ["neuphonic"];
+  if (preferred === "edge") {
+    return ["edge", "neuphonic"];
   }
-  return ["groq", "neuphonic"];
+  if (preferred === "neuphonic") {
+    return ["neuphonic", "edge"];
+  }
+  return ["groq", "edge", "neuphonic"];
 }
 
 export async function synthesizeSpeech(
@@ -41,11 +45,14 @@ export async function synthesizeSpeech(
   }
 
   const configured = {
+    edge: true, // no API key; uses public Microsoft Edge read-aloud service
     neuphonic: Boolean(env.NEUPHONIC_API_KEY),
     groq: Boolean(env.GROQ_API_KEY) && env.TTS_PROVIDER === "groq",
   } satisfies Record<TtsProviderName, boolean>;
+
   const order = providerOrder(env.TTS_PROVIDER);
   const providers = {
+    edge: synthesizeWithEdge,
     neuphonic: synthesizeWithNeuphonic,
     groq: synthesizeWithGroq,
   } satisfies Record<
@@ -61,7 +68,6 @@ export async function synthesizeSpeech(
 
     try {
       const result = await providers[provider](input);
-      // Guard against providers that "succeed" with a silent/empty payload.
       if (!result.audio || result.audio.byteLength < 256) {
         throw new Error(
           `${provider} returned empty audio (${result.audio?.byteLength ?? 0} bytes).`,
@@ -83,6 +89,6 @@ export async function synthesizeSpeech(
   }
 
   throw new TtsUnavailableError(
-    "No free cloud TTS is configured. Use browser speech (default).",
+    "No cloud TTS is configured. Use browser speech fallback.",
   );
 }

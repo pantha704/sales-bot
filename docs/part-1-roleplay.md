@@ -34,21 +34,20 @@ sequenceDiagram
 If Groq conversation generation fails, a deterministic in-character buyer
 answers and the interface labels the fallback.
 
-**Voice is free by default.** Buyer lines use the browser Web Speech API
-(`Voice: browser`). Paid Groq Orpheus is not used unless you opt in. Optional
-Neuphonic cloud TTS needs `TTS_PROVIDER=neuphonic` and `NEXT_PUBLIC_CLOUD_TTS=1`.
+**Voice is free by default.** Buyer lines use Microsoft Edge neural voices
+through `node-edge-tts` (no API key; badge `Voice: edge`). If Edge is blocked,
+the UI falls back to browser speech. Paid Groq Orpheus is opt-in only.
 
 ## Why this TTS stack
 
 | Option | License/cost shape | Assignment fit | Decision |
 |---|---|---|---|
-| Browser speech synthesis | Free, built into browsers | No key; works for the assignment demo | **Default** |
-| Neuphonic hosted API | Free/paid hosted tiers | Cloud voice when credits work | Optional |
+| Microsoft Edge neural TTS (`node-edge-tts`) | Free public read-aloud service; no key | Natural server audio without paid Orpheus | **Default** |
+| Browser speech synthesis | Free, built into browsers | Instant fallback if Edge fails | Fallback |
+| Neuphonic hosted API | Free/paid hosted tiers | Optional cloud path | Optional |
 | Groq Orpheus | **Paid** usage | Only if explicitly enabled | Opt-in only |
-| Qwen3-TTS / NeuTTS | Open models; you host compute | Future self-host option | Future |
 
-Default: `TTS_PROVIDER=browser`. Groq remains for free-tier chat/STT; buyer
-voice does not depend on paid Orpheus.
+Default: `TTS_PROVIDER=edge`. Groq stays for free-tier chat/STT only.
 
 ## Persona configuration
 

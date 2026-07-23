@@ -90,8 +90,9 @@ n8n Cloud
 | `GROQ_TTS_VOICE` | No | If Groq TTS | — | Default `troy` |
 | `NEUPHONIC_API_KEY` | No | For primary TTS | — | Server-only |
 | `NEUPHONIC_VOICE_ID` | No | With Neuphonic | — | |
-| `TTS_PROVIDER` | No | Recommended | — | `browser` (free default) \| `neuphonic` \| `groq` (paid) |
-| `NEXT_PUBLIC_CLOUD_TTS` | No | Only for cloud voice | — | `1` to call `/api/roleplay/speech` |
+| `TTS_PROVIDER` | No | Recommended | — | `edge` (free default) \| `browser` \| `neuphonic` \| `groq` (paid) |
+| `EDGE_TTS_VOICE` | No | With edge TTS | — | Default `en-US-AriaNeural` |
+| `NEXT_PUBLIC_CLOUD_TTS` | No | Optional | — | `0` forces browser-only voice |
 | `N8N_LEAD_WEBHOOK_URL` | No | — | **Yes** (production URL) | Not the n8n *test* URL |
 | `N8N_WEBHOOK_SECRET` | No | — | **Yes in prod** | Must match n8n Header Auth |
 

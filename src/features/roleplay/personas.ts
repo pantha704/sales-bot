@@ -21,6 +21,7 @@ export const personaPresets = [
     context:
       "HelioGrid has 85 sales representatives and recently missed its quarterly pipeline target. Maya agreed to a short discovery call but has reviewed several similar tools.",
     voice: {
+      id: "en-US-JennyNeural",
       style: "measured, guarded, confident, with restrained skepticism",
       rate: 0.96,
     },
@@ -45,6 +46,7 @@ export const personaPresets = [
     context:
       "Northstar is hiring 20 sellers this quarter. Daniel owns enablement operations and needs a solution that can launch without a long implementation.",
     voice: {
+      id: "en-US-GuyNeural",
       style: "professional, brisk, curious, and slightly impatient",
       rate: 1.04,
     },
@@ -65,6 +67,7 @@ export const personaPresets = [
     context:
       "ParcelMint has five sellers and no dedicated enablement manager. Aisha is actively looking for a lightweight way to improve discovery calls.",
     voice: {
+      id: "en-US-AriaNeural",
       style: "friendly, energetic, conversational, and open-minded",
       rate: 1.06,
     },
