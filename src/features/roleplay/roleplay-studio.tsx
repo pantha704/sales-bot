@@ -221,7 +221,8 @@ export function RoleplayStudio() {
       } else {
         utterance.lang = "en-US";
       }
-      utterance.rate = persona.voice.rate;
+      // Match server Edge TTS: ~1.2× snappier than raw persona rate.
+      utterance.rate = Math.min(2, Math.max(0.5, persona.voice.rate * 1.2));
       utterance.pitch = 1;
       utterance.volume = 1;
       utterance.onend = () => setActivity("ready");

@@ -12,14 +12,18 @@ import type {
 import { getServerEnv } from "@/lib/env";
 
 const DEFAULT_EDGE_VOICE = "en-US-AriaNeural";
+/** Global playback boost — buyer replies feel snappier in roleplay. */
+export const TTS_SPEED_MULTIPLIER = 1.2;
 
-/** Map persona rate (0.8–1.2) to Edge relative rate strings. */
+/**
+ * Map persona rate (0.8–1.2) to Edge relative rate strings.
+ * Applies TTS_SPEED_MULTIPLIER so default speech is ~1.2× faster.
+ */
 export function toEdgeRate(rate: number): string {
-  if (rate >= 1.12) return "+15%";
-  if (rate >= 1.04) return "+8%";
-  if (rate <= 0.88) return "-15%";
-  if (rate <= 0.96) return "-8%";
-  return "+0%";
+  const effective = Math.min(2, Math.max(0.5, rate * TTS_SPEED_MULTIPLIER));
+  const percent = Math.round((effective - 1) * 100);
+  if (percent === 0) return "+0%";
+  return percent > 0 ? `+${percent}%` : `${percent}%`;
 }
 
 export async function synthesizeWithEdge(

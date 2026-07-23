@@ -163,7 +163,7 @@ export async function synthesizeWithNeuphonic(
       const parsed = await requestNeuphonicSpeech({
         apiKey: env.NEUPHONIC_API_KEY,
         text,
-        speed: input.voice.rate,
+        speed: Math.min(1.5, Math.max(0.7, input.voice.rate * 1.2)),
         voiceId,
       });
       const samplingRate =
