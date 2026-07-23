@@ -1,0 +1,373 @@
+{
+  "name": "Eubrics - Lead Profiler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "eubrics-lead-profiler",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -900,
+        0
+      ],
+      "id": "c33d6e5a-e1d5-4c06-bf7b-2b9cf40f4f6a",
+      "name": "Lead Form Webhook",
+      "webhookId": "eubrics-lead-profiler",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WEBHOOK_HEADER_CREDENTIAL",
+          "name": "CloseLoop Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $input.first().json;\nconst body = incoming.body ?? incoming;\nconst required = ['leadId', 'submittedAt', 'name', 'email', 'company', 'query', 'pageHistory'];\nconst missing = required.filter((field) => body[field] === undefined || body[field] === null || body[field] === '');\n\nif (missing.length) {\n  throw new Error(`Missing required fields: ${missing.join(', ')}`);\n}\n\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(body.email))) {\n  throw new Error('Email address is invalid.');\n}\n\nif (!Array.isArray(body.pageHistory) || body.pageHistory.length === 0 || body.pageHistory.length > 10) {\n  throw new Error('pageHistory must contain between 1 and 10 page paths.');\n}\n\nconst clean = (value, max) => String(value ?? '').trim().slice(0, max);\n\nreturn [{\n  json: {\n    leadId: clean(body.leadId, 80),\n    submittedAt: clean(body.submittedAt, 40),\n    source: clean(body.source || 'website-form', 80),\n    name: clean(body.name, 80),\n    email: clean(body.email, 160).toLowerCase(),\n    company: clean(body.company, 100),\n    jobTitle: clean(body.jobTitle, 100),\n    query: clean(body.query, 1000),\n    pageHistory: body.pageHistory.map((page) => clean(page, 160)),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        0
+      ],
+      "id": "5ce35ca4-9933-4c88-8796-b0f8fab4dd2c",
+      "name": "Validate & Normalize"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'llama-3.3-70b-versatile', temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You profile inbound website leads. Return valid JSON only with exactly two string fields: category and reason. category must be exactly either Organizational Development or Sales Bots. Choose Organizational Development for leadership, management, culture, people development, or organizational coaching intent. Choose Sales Bots for sales practice, sales coaching, roleplay, enablement, objection handling, or AI sales tooling intent. Use the visitor message and browsing history together. The reason must be one concise sentence and must not include sensitive speculation.' }, { role: 'user', content: JSON.stringify({ name: $json.name, company: $json.company, jobTitle: $json.jobTitle, query: $json.query, pageHistory: $json.pageHistory }) } ] }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -410,
+        0
+      ],
+      "id": "cb539ed9-774c-4db9-955a-c7e1135205d0",
+      "name": "Groq Lead Classifier",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_GROQ_HEADER_CREDENTIAL",
+          "name": "Groq API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Validate & Normalize').first().json;\nconst raw = $input.first().json?.choices?.[0]?.message?.content;\n\nif (typeof raw !== 'string' || !raw.trim()) {\n  throw new Error('The classifier returned no content.');\n}\n\nlet profile;\ntry {\n  profile = JSON.parse(raw);\n} catch {\n  throw new Error('The classifier returned malformed JSON.');\n}\n\nconst allowed = ['Organizational Development', 'Sales Bots'];\nif (!allowed.includes(profile.category)) {\n  throw new Error('The classifier returned an unsupported category.');\n}\n\nconst reason = String(profile.reason ?? '').trim();\nif (reason.length < 5 || reason.length > 500) {\n  throw new Error('The classifier reason is missing or too long.');\n}\n\nreturn [{ json: { ...source, category: profile.category, reason } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        0
+      ],
+      "id": "c5b85a51-8f89-4d80-b66d-b074b9f720f8",
+      "name": "Validate Model Output"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Received At": "={{ $json.submittedAt }}",
+            "Lead ID": "={{ $json.leadId }}",
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Company": "={{ $json.company }}",
+            "Job Title": "={{ $json.jobTitle }}",
+            "Query": "={{ $json.query }}",
+            "Page History": "={{ $json.pageHistory.join(' → ') }}",
+            "Category": "={{ $json.category }}",
+            "Reason": "={{ $json.reason }}",
+            "Source": "={{ $json.source }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Received At",
+              "displayName": "Received At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Lead ID",
+              "displayName": "Lead ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Job Title",
+              "displayName": "Job Title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Query",
+              "displayName": "Query",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Page History",
+              "displayName": "Page History",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        100,
+        0
+      ],
+      "id": "8ff3082f-b89e-4c72-997b-1cd04cf65e71",
+      "name": "Append Lead to Google Sheets",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1500,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_GOOGLE_SHEETS_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "REPLACE_WITH_SALES_TEAM_EMAIL",
+        "subject": "={{ `[${$('Validate Model Output').item.json.category}] New lead: ${$('Validate Model Output').item.json.name} — ${$('Validate Model Output').item.json.company}` }}",
+        "emailType": "text",
+        "message": "={{ `A new website lead has been profiled.\\n\\nName: ${$('Validate Model Output').item.json.name}\\nEmail: ${$('Validate Model Output').item.json.email}\\nCompany: ${$('Validate Model Output').item.json.company}\\nJob title: ${$('Validate Model Output').item.json.jobTitle || 'Not provided'}\\nCategory: ${$('Validate Model Output').item.json.category}\\nReason: ${$('Validate Model Output').item.json.reason}\\nQuery: ${$('Validate Model Output').item.json.query}\\nPages visited: ${$('Validate Model Output').item.json.pageHistory.join(' → ')}\\nLead ID: ${$('Validate Model Output').item.json.leadId}` }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        360,
+        0
+      ],
+      "id": "c7c4865a-e671-473c-80c9-520987e20dc0",
+      "name": "Notify Sales Team",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 1500,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, leadId: $('Validate Model Output').item.json.leadId, category: $('Validate Model Output').item.json.category, reason: $('Validate Model Output').item.json.reason, message: 'Lead saved and sales team notified.' }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        620,
+        0
+      ],
+      "id": "0ca08a1a-3453-4388-b7d9-f81688a50286",
+      "name": "Return Profile"
+    }
+  ],
+  "connections": {
+    "Lead Form Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Normalize": {
+      "main": [
+        [
+          {
+            "node": "Groq Lead Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Lead Classifier": {
+      "main": [
+        [
+          {
+            "node": "Validate Model Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Model Output": {
+      "main": [
+        [
+          {
+            "node": "Append Lead to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Lead to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Sales Team": {
+      "main": [
+        [
+          {
+            "node": "Return Profile",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "ea2c38f4-b1a8-4591-9643-51e2cc1f86aa",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

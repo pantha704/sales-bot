@@ -1,0 +1,89 @@
+{
+  "name": "Eubrics - Lead Profiler Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -280,
+        0
+      ],
+      "id": "6e8ebf4d-0894-4943-9339-63d4b081cb4a",
+      "name": "Workflow Error Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.first().json;\nconst execution = event.execution ?? {};\nconst workflow = event.workflow ?? {};\nconst clean = (value, max = 500) => String(value ?? 'Unknown').replace(/[\\r\\n]+/g, ' ').slice(0, max);\n\nreturn [{\n  json: {\n    workflowName: clean(workflow.name, 120),\n    executionId: clean(execution.id, 100),\n    lastNode: clean(execution.lastNodeExecuted, 120),\n    errorMessage: clean(execution.error?.message),\n    executionUrl: clean(execution.url, 500),\n    occurredAt: new Date().toISOString(),\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        0
+      ],
+      "id": "c610b186-3dd1-4921-a197-a7e337e92534",
+      "name": "Sanitize Error"
+    },
+    {
+      "parameters": {
+        "sendTo": "REPLACE_WITH_OPERATIONS_EMAIL",
+        "subject": "={{ `[n8n failure] ${$json.workflowName}` }}",
+        "emailType": "text",
+        "message": "={{ `A lead-profiler execution failed.\\n\\nWorkflow: ${$json.workflowName}\\nExecution: ${$json.executionId}\\nLast node: ${$json.lastNode}\\nError: ${$json.errorMessage}\\nTime: ${$json.occurredAt}\\nExecution URL: ${$json.executionUrl}` }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        200,
+        0
+      ],
+      "id": "b62217d1-d32a-4380-a285-5538d4da1d7f",
+      "name": "Send Sanitized Alert",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_GMAIL_CREDENTIAL",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Workflow Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Sanitize Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sanitize Error": {
+      "main": [
+        [
+          {
+            "node": "Send Sanitized Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "380010ab-861b-450b-a0ab-aa6f78de654b",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
