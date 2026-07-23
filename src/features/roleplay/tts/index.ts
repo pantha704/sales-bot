@@ -53,12 +53,13 @@ export async function synthesizeSpeech(
       return result;
     } catch (error) {
       lastError = error;
+      console.error(`[tts] provider=${provider} failed`, error);
     }
   }
 
   if (lastError instanceof Error) {
     throw new TtsUnavailableError(
-      "Configured text-to-speech providers could not generate audio.",
+      `Configured text-to-speech providers could not generate audio: ${lastError.message}`,
     );
   }
 

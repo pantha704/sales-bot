@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const unavailable = error instanceof TtsUnavailableError;
+    console.error("[api/roleplay/speech]", error);
 
     return Response.json(
       {
@@ -47,6 +48,11 @@ export async function POST(request: Request) {
           ? "Cloud speech is unavailable; use the browser voice fallback."
           : safeErrorMessage(error),
         fallback: "browser",
+        // Helps diagnose provider failures without exposing secrets.
+        detail:
+          error instanceof Error
+            ? error.message.replace(/api[_-]?key[=:][^\s&,]+/gi, "api_key=***")
+            : undefined,
       },
       {
         status: unavailable ? 503 : 502,
