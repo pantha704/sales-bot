@@ -56,4 +56,34 @@ describe("mock scorer", () => {
     }));
     expect(overallFromDimensions(dimensions)).toBe(80);
   });
+
+  it("scores weak product-dump calls strictly below average", () => {
+    const weak = generateMockScore({
+      sessionId: crypto.randomUUID(),
+      persona: defaultPersona,
+      messages: [
+        message("buyer", "What is this about?", 0),
+        message(
+          "seller",
+          "Our AI platform has amazing features and a dashboard that automates everything for sales teams.",
+          1,
+        ),
+        message("buyer", "Okay.", 2),
+        message(
+          "seller",
+          "The solution is powerful and uses AI tools to help reps. Let me know if you want more info.",
+          3,
+        ),
+      ],
+    });
+
+    expect(weak.overallScore).toBeLessThan(50);
+    expect(
+      weak.dimensions.find((dimension) => dimension.id === "next_steps")?.score,
+    ).toBeLessThan(4);
+    expect(
+      weak.dimensions.find((dimension) => dimension.id === "discovery")?.score,
+    ).toBeLessThan(4);
+  });
 });
+

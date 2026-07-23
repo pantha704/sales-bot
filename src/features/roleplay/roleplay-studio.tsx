@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
+  ArrowLeft,
   Bot,
   Check,
   ClipboardCheck,
@@ -108,6 +109,7 @@ export function RoleplayStudio() {
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [score, setScore] = useState<ScoreResponse | null>(null);
+  const [scoreViewOpen, setScoreViewOpen] = useState(false);
   const [isScoring, setIsScoring] = useState(false);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -117,10 +119,15 @@ export function RoleplayStudio() {
     (message) => message.role === "seller",
   ).length;
   const canScore =
-    sellerTurnCount >= MIN_SELLER_TURNS_TO_SCORE && !isScoring && !recorder.isRecording;
+    sellerTurnCount >= MIN_SELLER_TURNS_TO_SCORE &&
+    !isScoring &&
+    !recorder.isRecording &&
+    !scoreViewOpen;
+  const chatLocked = scoreViewOpen || isScoring;
   const isBusy =
     activity !== "ready" ||
     isScoring ||
+    chatLocked ||
     recorder.status === "requesting" ||
     recorder.status === "stopping";
 
@@ -159,6 +166,7 @@ export function RoleplayStudio() {
     setResponseMode(null);
     setVoiceProvider(null);
     setScore(null);
+    setScoreViewOpen(false);
     setIsScoring(false);
     setActivity("ready");
     recorder.clearError();
@@ -500,14 +508,27 @@ export function RoleplayStudio() {
     URL.revokeObjectURL(url);
   }
 
-  async function scoreCall() {
-    if (!canScore || activity !== "ready") {
+  async function scoreCall(options?: { force?: boolean }) {
+    // Re-open an existing score card without re-running the coach.
+    if (score && !options?.force && !isScoring) {
+      setScoreViewOpen(true);
+      setNotice("Reviewing your last call score. Chat is paused until you go back.");
+      return;
+    }
+
+    if (
+      sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE ||
+      isScoring ||
+      recorder.isRecording ||
+      activity !== "ready"
+    ) {
       return;
     }
 
     setIsScoring(true);
     setError(null);
     setNotice(null);
+    stopPlayback();
 
     try {
       const response = await fetch("/api/roleplay/score", {
@@ -534,12 +555,13 @@ export function RoleplayStudio() {
       }
 
       setScore(parsed.data);
+      setScoreViewOpen(true);
       setNotice(
         parsed.data.fallbackReason
-          ? `${parsed.data.fallbackReason} A deterministic demo score was used instead.`
+          ? `${parsed.data.fallbackReason} A strict demo rubric was used instead.`
           : parsed.data.mode === "live"
-            ? "Live coach score ready."
-            : "Demo coach score ready.",
+            ? "Live coach score ready. Chat is paused while you review."
+            : "Demo coach score ready. Chat is paused while you review.",
       );
     } catch (cause) {
       setError(
@@ -550,6 +572,11 @@ export function RoleplayStudio() {
     } finally {
       setIsScoring(false);
     }
+  }
+
+  function backToChat() {
+    setScoreViewOpen(false);
+    setNotice("Back in the call. You can keep practicing or re-open the score card.");
   }
 
   return (
@@ -730,14 +757,27 @@ export function RoleplayStudio() {
               <Button
                 type="button"
                 size="icon"
-                variant="ghost"
+                variant={scoreViewOpen ? "secondary" : "ghost"}
                 onClick={() => void scoreCall()}
-                disabled={!canScore || activity !== "ready"}
-                aria-label="Score this call"
+                disabled={
+                  isScoring ||
+                  recorder.isRecording ||
+                  (sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE && !score) ||
+                  (activity !== "ready" && !score)
+                }
+                aria-label={
+                  scoreViewOpen
+                    ? "Score card open"
+                    : score
+                      ? "Open score card"
+                      : "Score this call"
+                }
                 title={
-                  sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE
+                  sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE && !score
                     ? `Need ${MIN_SELLER_TURNS_TO_SCORE} seller turns to score`
-                    : "Score this call"
+                    : score
+                      ? "Open score card"
+                      : "Score this call"
                 }
               >
                 {isScoring ? (
@@ -751,7 +791,11 @@ export function RoleplayStudio() {
                 size="icon"
                 variant="ghost"
                 onClick={() => resetSession()}
-                disabled={isBusy || recorder.isRecording}
+                disabled={
+                  isScoring ||
+                  recorder.isRecording ||
+                  (activity !== "ready" && !scoreViewOpen)
+                }
                 aria-label="Start a new session"
               >
                 <RefreshCw aria-hidden="true" />
@@ -770,146 +814,181 @@ export function RoleplayStudio() {
         </CardHeader>
 
         <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 py-2">
-              <div className="flex justify-center">
-                <span className="rounded-full border border-border/80 bg-background/50 px-3 py-1 text-[0.68rem] text-muted-foreground">
-                  Discovery call · {persona.industry} ·{" "}
-                  <span className="capitalize">{persona.difficulty}</span>
-                </span>
-              </div>
-
-              {messages.map((message) => {
-                const buyer = message.role === "buyer";
-
-                return (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex gap-3",
-                      buyer ? "justify-start" : "justify-end",
-                    )}
+          {scoreViewOpen && score ? (
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="mx-auto w-full max-w-3xl space-y-4 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={backToChat}
+                    className="gap-1.5"
                   >
-                    {buyer ? (
-                      <span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Bot className="size-3.5" aria-hidden="true" />
-                      </span>
-                    ) : null}
-                    <div
-                      className={cn(
-                        "max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[75%]",
-                        buyer
-                          ? "rounded-tl-md border border-border/80 bg-background/65"
-                          : "rounded-tr-md bg-primary text-primary-foreground",
-                      )}
-                    >
-                      <p>{message.content}</p>
-                      <p
-                        className={cn(
-                          "mt-1.5 text-[0.66rem]",
-                          buyer
-                            ? "text-muted-foreground"
-                            : "text-primary-foreground/65",
-                        )}
-                      >
-                        {buyer ? persona.name : "You"}
+                    <ArrowLeft className="size-3.5" aria-hidden="true" />
+                    Back to chat
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void scoreCall({ force: true })}
+                    disabled={
+                      isScoring ||
+                      activity !== "ready" ||
+                      sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE
+                    }
+                  >
+                    {isScoring ? "Rescoring…" : "Rescore call"}
+                  </Button>
+                </div>
+
+                <div className="rounded-2xl border border-border/80 bg-background/55 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium tracking-tight">
+                        Call score
+                      </p>
+                      <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                        {score.summary}
                       </p>
                     </div>
-                  </div>
-                );
-              })}
-
-              {activity === "thinking" ? (
-                <div className="flex items-center gap-3">
-                  <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Bot className="size-3.5" aria-hidden="true" />
-                  </span>
-                  <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md border border-border/80 bg-background/65 px-4 py-3">
-                    {[0, 1, 2].map((dot) => (
-                      <span
-                        key={dot}
-                        className="size-1.5 animate-pulse rounded-full bg-muted-foreground"
-                        style={{ animationDelay: `${dot * 160}ms` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              <div ref={transcriptEndRef} />
-            </div>
-          </div>
-
-          {score ? (
-            <div className="mx-auto w-full max-w-3xl rounded-2xl border border-border/80 bg-background/55 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium tracking-tight">
-                    Call score
-                  </p>
-                  <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                    {score.summary}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="capitalize">
-                    {score.mode === "live" ? "Live coach" : "Demo score"}
-                  </Badge>
-                  <span className="text-2xl font-semibold tabular-nums tracking-tight">
-                    {score.overallScore}
-                    <span className="text-sm font-normal text-muted-foreground">
-                      /100
-                    </span>
-                  </span>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {score.dimensions.map((dimension) => (
-                  <div
-                    key={dimension.id}
-                    className="rounded-xl border border-border/70 bg-card/40 px-3 py-2.5"
-                  >
-                    <div className="flex items-center justify-between gap-2 text-sm">
-                      <span className="font-medium">{dimension.label}</span>
-                      <span className="tabular-nums text-muted-foreground">
-                        {dimension.score}/10
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="capitalize">
+                        {score.mode === "live" ? "Live coach" : "Demo score"}
+                      </Badge>
+                      <span className="text-2xl font-semibold tabular-nums tracking-tight">
+                        {score.overallScore}
+                        <span className="text-sm font-normal text-muted-foreground">
+                          /100
+                        </span>
                       </span>
                     </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-primary/80"
-                        style={{ width: `${dimension.score * 10}%` }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                      {dimension.note}
-                    </p>
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Strengths
-                  </p>
-                  <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/90">
-                    {score.strengths.map((item) => (
-                      <li key={item}>{item}</li>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {score.dimensions.map((dimension) => (
+                      <div
+                        key={dimension.id}
+                        className="rounded-xl border border-border/70 bg-card/40 px-3 py-2.5"
+                      >
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="font-medium">{dimension.label}</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {dimension.score}/10
+                          </span>
+                        </div>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary/80"
+                            style={{ width: `${dimension.score * 10}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          {dimension.note}
+                        </p>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Strengths
+                      </p>
+                      <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/90">
+                        {score.strengths.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Improvements
+                      </p>
+                      <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/90">
+                        {score.improvements.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Improvements
-                  </p>
-                  <ul className="mt-1.5 list-disc space-y-1 pl-4 text-sm text-foreground/90">
-                    {score.improvements.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
+
+                <p className="text-center text-xs text-muted-foreground">
+                  Chat is paused on the score card. Use Back to chat to continue
+                  the roleplay.
+                </p>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 py-2">
+                <div className="flex justify-center">
+                  <span className="rounded-full border border-border/80 bg-background/50 px-3 py-1 text-[0.68rem] text-muted-foreground">
+                    Discovery call · {persona.industry} ·{" "}
+                    <span className="capitalize">{persona.difficulty}</span>
+                  </span>
+                </div>
+
+                {messages.map((message) => {
+                  const buyer = message.role === "buyer";
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={cn(
+                        "flex gap-3",
+                        buyer ? "justify-start" : "justify-end",
+                      )}
+                    >
+                      {buyer ? (
+                        <span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Bot className="size-3.5" aria-hidden="true" />
+                        </span>
+                      ) : null}
+                      <div
+                        className={cn(
+                          "max-w-[86%] rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[75%]",
+                          buyer
+                            ? "rounded-tl-md border border-border/80 bg-background/65"
+                            : "rounded-tr-md bg-primary text-primary-foreground",
+                        )}
+                      >
+                        <p>{message.content}</p>
+                        <p
+                          className={cn(
+                            "mt-1.5 text-[0.66rem]",
+                            buyer
+                              ? "text-muted-foreground"
+                              : "text-primary-foreground/65",
+                          )}
+                        >
+                          {buyer ? persona.name : "You"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {activity === "thinking" ? (
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Bot className="size-3.5" aria-hidden="true" />
+                    </span>
+                    <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md border border-border/80 bg-background/65 px-4 py-3">
+                      {[0, 1, 2].map((dot) => (
+                        <span
+                          key={dot}
+                          className="size-1.5 animate-pulse rounded-full bg-muted-foreground"
+                          style={{ animationDelay: `${dot * 160}ms` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <div ref={transcriptEndRef} />
+              </div>
+            </div>
+          )}
 
           <div className="mx-auto w-full max-w-3xl space-y-3 border-t border-border/70 pt-4">
             {error || recorder.error ? (
@@ -932,13 +1011,15 @@ export function RoleplayStudio() {
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={handleDraftKeyDown}
                 placeholder={
-                  recorder.isRecording
-                    ? "Listening… tap stop when you finish"
-                    : "Ask a discovery question or present your value proposition…"
+                  scoreViewOpen
+                    ? "Score card open — go back to chat to keep selling…"
+                    : recorder.isRecording
+                      ? "Listening… tap stop when you finish"
+                      : "Ask a discovery question or present your value proposition…"
                 }
                 className="min-h-24 resize-none bg-background/55 pr-24 pb-11 leading-6"
                 maxLength={1_200}
-                disabled={isBusy || recorder.isRecording}
+                disabled={isBusy || recorder.isRecording || scoreViewOpen}
                 aria-label="Your sales message"
               />
               <div className="absolute right-2 bottom-2 flex items-center gap-2">
@@ -947,7 +1028,7 @@ export function RoleplayStudio() {
                   size="icon"
                   variant={recorder.isRecording ? "destructive" : "outline"}
                   onClick={handleMicrophone}
-                  disabled={isBusy}
+                  disabled={isBusy || scoreViewOpen}
                   aria-label={
                     recorder.isRecording ? "Stop recording" : "Record message"
                   }
@@ -965,7 +1046,12 @@ export function RoleplayStudio() {
                 <Button
                   type="submit"
                   size="icon"
-                  disabled={!draft.trim() || isBusy || recorder.isRecording}
+                  disabled={
+                    !draft.trim() ||
+                    isBusy ||
+                    recorder.isRecording ||
+                    scoreViewOpen
+                  }
                   aria-label="Send message"
                 >
                   {isBusy && !recorder.isRecording ? (

@@ -56,7 +56,7 @@ export async function generateLiveScore(
   const env = getServerEnv();
   const completion = await getGroqClient().chat.completions.create({
     model: env.GROQ_CHAT_MODEL,
-    temperature: 0.25,
+    temperature: 0.15,
     max_completion_tokens: 700,
     response_format: { type: "json_object" },
     messages: [
