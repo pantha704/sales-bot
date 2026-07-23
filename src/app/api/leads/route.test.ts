@@ -82,6 +82,7 @@ describe("POST /api/leads", () => {
       "N8N_LEAD_WEBHOOK_URL",
       "https://example.n8n.cloud/webhook/eubrics-lead-profiler",
     );
+    vi.stubEnv("N8N_WEBHOOK_SECRET", "test-webhook-secret");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(Response.json({ success: true })),
@@ -98,5 +99,25 @@ describe("POST /api/leads", () => {
 
     expect(response.status).toBe(502);
     expect(body.code).toBe("WORKFLOW_UNAVAILABLE");
+  });
+
+  it("fails closed when webhook URL is configured without a secret", async () => {
+    vi.stubEnv(
+      "N8N_LEAD_WEBHOOK_URL",
+      "https://example.n8n.cloud/webhook/eubrics-lead-profiler",
+    );
+    vi.stubEnv("N8N_WEBHOOK_SECRET", "");
+
+    const response = await POST(
+      new Request("http://localhost/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validLead),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.code).toBe("ENV_MISCONFIGURED");
   });
 });

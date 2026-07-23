@@ -3,12 +3,20 @@ import {
   n8nLeadResponseSchema,
 } from "@/features/leads/schemas";
 import { profileLeadLocally } from "@/features/leads/mock-profiler";
-import { getServerEnv } from "@/lib/env";
+import {
+  assertLiveN8nConfig,
+  envConfigErrorResponse,
+  getServerEnv,
+} from "@/lib/env";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "leads");
+  if (limited) return limited;
+
   const body = await request.json().catch(() => null);
   const parsed = leadSubmissionSchema.safeParse(body);
 
@@ -43,14 +51,21 @@ export async function POST(request: Request) {
     );
   }
 
+  let live;
   try {
-    const response = await fetch(env.N8N_LEAD_WEBHOOK_URL, {
+    live = assertLiveN8nConfig(env);
+  } catch (error) {
+    const response = envConfigErrorResponse(error);
+    if (response) return response;
+    throw error;
+  }
+
+  try {
+    const response = await fetch(live.webhookUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(env.N8N_WEBHOOK_SECRET
-          ? { "X-Webhook-Secret": env.N8N_WEBHOOK_SECRET }
-          : {}),
+        "X-Webhook-Secret": live.webhookSecret,
       },
       body: JSON.stringify({
         leadId,

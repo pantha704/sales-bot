@@ -1,6 +1,7 @@
 import { toFile } from "groq-sdk";
 import { getServerEnv } from "@/lib/env";
 import { getGroqClient } from "@/lib/groq";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { safeErrorMessage } from "@/lib/safe-error";
 
 export const runtime = "nodejs";
@@ -18,6 +19,9 @@ const supportedAudioTypes = new Map([
 ]);
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "roleplay-transcribe");
+  if (limited) return limited;
+
   const formData = await request.formData().catch(() => null);
   const audio = formData?.get("audio");
 

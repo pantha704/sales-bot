@@ -24,7 +24,7 @@ risk for a public production URL.
 | Safe provider error messages | Present |
 | Vitest unit/route tests + GitHub Actions CI | Present |
 | Auth / sessions / multi-tenant | **Absent** |
-| Rate limiting / spend caps | **Absent** |
+| Rate limiting / spend caps | **Present** (Upstash when configured; memory fallback) |
 | Security headers in `next.config` | **P0 (added for deploy)** |
 | Structured observability (Sentry, etc.) | **Absent** |
 | Durable lead storage in-app | **Absent** (n8n → Sheets) |
@@ -152,11 +152,11 @@ npm run dev
 
 | ID | Task | Acceptance criteria | Implementation notes |
 |----|------|---------------------|----------------------|
-| C1 | Rate limit `/api/roleplay/*` and `/api/leads` | Burst + sustained limits per IP | Prefer **Upstash Redis** `@upstash/ratelimit` (serverless-safe). In-memory maps are **not** reliable on Vercel. |
-| C2 | Require `N8N_WEBHOOK_SECRET` when URL set | Boot or request fails closed | Tighten `src/lib/env.ts` + leads route |
-| C3 | Production mock policy | Either fail closed without keys, or banner “Demo mode” always visible | Product decision |
-| C4 | JSON body size limits | Reject oversized conversation histories | Cap messages array length (schema already partial) |
-| C5 | CAPTCHA or light auth on public lead form | Blocks trivial bot spam | Turnstile / hCaptcha |
+| C1 | Rate limit `/api/roleplay/*` and `/api/leads` | Burst + sustained limits per IP | **Done** — `src/lib/rate-limit.ts` (Upstash sliding window; memory fallback) |
+| C2 | Require `N8N_WEBHOOK_SECRET` when URL set | Request fails closed (503) | **Done** — `src/lib/env.ts` superRefine + leads route |
+| C3 | Production mock policy | Either fail closed without keys, or banner “Demo mode” always visible | Product decision (UI already labels Demo/Live) |
+| C4 | JSON body size limits | Reject oversized conversation histories | **Partial** — Zod caps messages (30), content lengths |
+| C5 | CAPTCHA or light auth on public lead form | Blocks trivial bot spam | Turnstile / hCaptcha (optional next) |
 | C6 | Spend alerts on Groq + Neuphonic dashboards | Alert before budget blowout | External dashboards |
 | C7 | Secret scanning in CI | gitleaks or GitHub secret scanning | CI job |
 
@@ -327,3 +327,4 @@ These are product expansions, not deploy blockers for a single-tenant demo.
 | When | Action |
 |------|--------|
 | 2026-07-24 | Plan written; security headers; Vercel production deploy initiated |
+| 2026-07-24 | Phase C: Upstash/memory rate limits + fail-closed n8n webhook secret |

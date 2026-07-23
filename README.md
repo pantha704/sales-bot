@@ -64,11 +64,20 @@ NEUPHONIC_API_KEY=
 NEUPHONIC_VOICE_ID=
 TTS_PROVIDER=neuphonic
 
+# Both required for live leads (secret is fail-closed when URL is set).
 N8N_LEAD_WEBHOOK_URL=
 N8N_WEBHOOK_SECRET=
+
+# Optional: serverless rate limits (recommended on Vercel production).
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
 
 Never prefix these values with `NEXT_PUBLIC_` and never commit `.env.local`.
+
+API routes are rate-limited per IP. With Upstash credentials the limits are
+shared across serverless instances; without them a process-local fallback is
+used (fine for local demo, weaker on multi-instance production).
 
 ## Repository map
 

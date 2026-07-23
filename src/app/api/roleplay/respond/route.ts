@@ -2,12 +2,16 @@ import { generateLiveBuyerReply } from "@/features/roleplay/live-buyer";
 import { conversationRequestSchema } from "@/features/roleplay/schemas";
 import { generateMockBuyerReply } from "@/features/roleplay/mock-buyer";
 import { getServerEnv } from "@/lib/env";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { safeErrorMessage } from "@/lib/safe-error";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  const limited = await enforceRateLimit(request, "roleplay-respond");
+  if (limited) return limited;
+
   const body = await request.json().catch(() => null);
   const parsed = conversationRequestSchema.safeParse(body);
 
