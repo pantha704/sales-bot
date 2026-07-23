@@ -40,6 +40,7 @@ messages, and the roleplay has deterministic and browser-native fallbacks.
 - Groq Whisper for speech-to-text
 - Groq-hosted Llama for the buyer conversation
 - Neuphonic TTS, with Groq Orpheus and browser speech fallbacks (empty cloud audio is treated as failure)
+- **Groq Orpheus note:** the org admin must accept model terms once in the [Groq console](https://console.groq.com/docs/text-to-speech/orpheus) or speech returns 503 and the UI falls back to browser voice
 - Zod validation at all external boundaries
 - n8n Cloud, Google Sheets, Gmail, and the Groq API
 - Vitest, ESLint, TypeScript, and a production-build CI gate

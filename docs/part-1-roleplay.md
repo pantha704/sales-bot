@@ -52,6 +52,10 @@ mean inference hosting, memory, bandwidth, or an always-on endpoint is free.
 Qwen/NeuTTS become attractive after the assignment if an always-on machine is
 available and privacy or voice ownership outweighs deployment simplicity.
 
+Groq Orpheus requires a one-time terms acceptance by the org admin in the
+[Groq console](https://console.groq.com/docs/text-to-speech/orpheus). Until that
+is done, Orpheus returns 400 and the app falls through to browser speech.
+
 The primary provider is selected with `TTS_PROVIDER=neuphonic`. Changing it to
 `groq` reverses the first two attempts without changing UI code.
 
