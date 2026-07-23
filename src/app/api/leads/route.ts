@@ -76,19 +76,38 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(20_000),
       cache: "no-store",
     });
+
+    if (!response.ok) {
+      throw new Error(`Workflow HTTP ${response.status}`);
+    }
+
     const payload: unknown = await response.json().catch(() => null);
     const profiled = n8nLeadResponseSchema.safeParse(payload);
 
-    if (!response.ok || !profiled.success) {
-      throw new Error("The workflow returned an invalid response.");
+    // Prefer the workflow body when it is well-formed.
+    if (profiled.success) {
+      return Response.json(
+        {
+          leadId: profiled.data.leadId,
+          category: profiled.data.category,
+          reason: profiled.data.reason,
+          mode: "live",
+        },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     }
 
+    // n8n accepted the request (Sheet/email side effects likely ran) but the
+    // Respond-to-Webhook body was empty or malformed. Return a live result
+    // using our request leadId + local classifier for the UI payload.
+    const fallback = profileLeadLocally(parsed.data);
     return Response.json(
       {
-        leadId: profiled.data.leadId,
-        category: profiled.data.category,
-        reason: profiled.data.reason,
+        leadId,
+        category: fallback.category,
+        reason: fallback.reason,
         mode: "live",
+        responseDegraded: true,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

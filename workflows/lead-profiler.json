@@ -275,8 +275,21 @@
     },
     {
       "parameters": {
+        "jsCode": "const d = $('Validate Model Output').first().json;\nreturn [{\n  json: {\n    success: true,\n    leadId: d.leadId,\n    category: d.category,\n    reason: d.reason,\n    message: 'Lead saved and sales team notified.',\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        620,
+        0
+      ],
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Build API Response"
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, leadId: $('Validate Model Output').item.json.leadId, category: $('Validate Model Output').item.json.category, reason: $('Validate Model Output').item.json.reason, message: 'Lead saved and sales team notified.' }) }}",
+        "responseBody": "={{ $json }}",
         "options": {
           "responseCode": 200
         }
@@ -284,7 +297,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        620,
+        860,
         0
       ],
       "id": "0ca08a1a-3453-4388-b7d9-f81688a50286",
@@ -348,6 +361,17 @@
       ]
     },
     "Notify Sales Team": {
+      "main": [
+        [
+          {
+            "node": "Build API Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build API Response": {
       "main": [
         [
           {

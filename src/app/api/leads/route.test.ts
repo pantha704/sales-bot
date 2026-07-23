@@ -72,12 +72,13 @@ describe("POST /api/leads", () => {
 
     expect(response.status).toBe(200);
     expect(body.mode).toBe("live");
+    expect(body.leadId).toBe("625f21cc-14a9-45e3-85ac-5932af2557d1");
     expect(options.headers).toMatchObject({
       "X-Webhook-Secret": "test-webhook-secret",
     });
   });
 
-  it("does not claim success when the workflow returns invalid data", async () => {
+  it("still returns live mode when n8n returns HTTP 200 with an empty body", async () => {
     vi.stubEnv(
       "N8N_LEAD_WEBHOOK_URL",
       "https://example.n8n.cloud/webhook/eubrics-lead-profiler",
@@ -85,7 +86,43 @@ describe("POST /api/leads", () => {
     vi.stubEnv("N8N_WEBHOOK_SECRET", "test-webhook-secret");
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(Response.json({ success: true })),
+      vi.fn().mockResolvedValue(
+        new Response("", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validLead),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("live");
+    expect(body.responseDegraded).toBe(true);
+    expect(body.category).toBe("Sales Bots");
+    expect(body.leadId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+  });
+
+  it("does not claim success when the workflow HTTP status fails", async () => {
+    vi.stubEnv(
+      "N8N_LEAD_WEBHOOK_URL",
+      "https://example.n8n.cloud/webhook/eubrics-lead-profiler",
+    );
+    vi.stubEnv("N8N_WEBHOOK_SECRET", "test-webhook-secret");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("fail", { status: 500 }),
+      ),
     );
 
     const response = await POST(
