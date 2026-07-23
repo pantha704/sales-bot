@@ -78,6 +78,41 @@ describe("POST /api/leads", () => {
     });
   });
 
+  it("parses n8n bodies that are prefixed with a stray equals sign", async () => {
+    vi.stubEnv(
+      "N8N_LEAD_WEBHOOK_URL",
+      "https://example.n8n.cloud/webhook/eubrics-lead-profiler",
+    );
+    vi.stubEnv("N8N_WEBHOOK_SECRET", "test-webhook-secret");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          '={"success":true,"leadId":"625f21cc-14a9-45e3-85ac-5932af2557d1","category":"Sales Bots","reason":"The visitor is evaluating AI sales practice."}',
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(validLead),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mode).toBe("live");
+    expect(body.responseDegraded).toBeUndefined();
+    expect(body.leadId).toBe("625f21cc-14a9-45e3-85ac-5932af2557d1");
+    expect(body.category).toBe("Sales Bots");
+  });
+
   it("still returns live mode when n8n returns HTTP 200 with an empty body", async () => {
     vi.stubEnv(
       "N8N_LEAD_WEBHOOK_URL",

@@ -81,7 +81,16 @@ export async function POST(request: Request) {
       throw new Error(`Workflow HTTP ${response.status}`);
     }
 
-    const payload: unknown = await response.json().catch(() => null);
+    // n8n Text responses sometimes prefix a stray "=" before JSON.
+    const rawText = (await response.text()).trim().replace(/^=+/, "");
+    let payload: unknown = null;
+    if (rawText) {
+      try {
+        payload = JSON.parse(rawText);
+      } catch {
+        payload = null;
+      }
+    }
     const profiled = n8nLeadResponseSchema.safeParse(payload);
 
     // Prefer the workflow body when it is well-formed.
