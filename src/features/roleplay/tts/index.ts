@@ -35,7 +35,7 @@ export async function synthesizeSpeech(
     TtsProviderName,
     (value: SynthesisInput) => Promise<SynthesisResult>
   >;
-  let lastError: unknown;
+  const errors: string[] = [];
 
   for (const provider of order) {
     if (!configured[provider]) {
@@ -52,14 +52,16 @@ export async function synthesizeSpeech(
       }
       return result;
     } catch (error) {
-      lastError = error;
+      const message =
+        error instanceof Error ? error.message : String(error ?? "unknown");
+      errors.push(`${provider}: ${message}`);
       console.error(`[tts] provider=${provider} failed`, error);
     }
   }
 
-  if (lastError instanceof Error) {
+  if (errors.length > 0) {
     throw new TtsUnavailableError(
-      `Configured text-to-speech providers could not generate audio: ${lastError.message}`,
+      `Configured text-to-speech providers could not generate audio. ${errors.join(" | ")}`,
     );
   }
 
