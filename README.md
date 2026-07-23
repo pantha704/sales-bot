@@ -39,7 +39,7 @@ messages, and the roleplay has deterministic and browser-native fallbacks.
 - Next.js 16, React 19, TypeScript, Tailwind CSS, and shadcn/ui
 - Groq Whisper for speech-to-text
 - Groq-hosted Llama for the buyer conversation
-- Neuphonic TTS, with Groq Orpheus and browser speech fallbacks
+- Neuphonic TTS, with Groq Orpheus and browser speech fallbacks (empty cloud audio is treated as failure)
 - Zod validation at all external boundaries
 - n8n Cloud, Google Sheets, Gmail, and the Groq API
 - Vitest, ESLint, TypeScript, and a production-build CI gate

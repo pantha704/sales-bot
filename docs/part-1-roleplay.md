@@ -32,9 +32,10 @@ sequenceDiagram
 ```
 
 If Groq conversation generation fails, a deterministic in-character buyer
-answers and the interface labels the fallback. If cloud TTS fails, the sequence
-is Neuphonic → Groq Orpheus → browser speech. A cloud outage therefore does not
-make the demo unusable.
+answers and the interface labels the fallback. If cloud TTS fails (including
+empty/silent audio payloads), the sequence is Neuphonic → Groq Orpheus →
+browser speech. The UI badge shows which path played (`neuphonic`, `groq`, or
+`browser`). A cloud outage therefore does not make the demo unusable.
 
 ## Why this TTS stack
 

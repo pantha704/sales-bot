@@ -175,6 +175,28 @@ export function RoleplayStudio() {
     resetSession(nextPersona);
   }
 
+  function pickBrowserVoice(): SpeechSynthesisVoice | null {
+    if (!("speechSynthesis" in window)) {
+      return null;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      return null;
+    }
+
+    return (
+      voices.find(
+        (voice) =>
+          voice.lang.toLowerCase().startsWith("en") &&
+          /google|natural|premium|enhanced|neural/i.test(voice.name),
+      ) ??
+      voices.find((voice) => voice.lang.toLowerCase().startsWith("en")) ??
+      voices[0] ??
+      null
+    );
+  }
+
   function speakWithBrowser(text: string) {
     if (!("speechSynthesis" in window)) {
       setNotice("Audio is unavailable in this browser; the transcript is ready.");
@@ -182,15 +204,49 @@ export function RoleplayStudio() {
       return;
     }
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = persona.voice.rate;
-    utterance.pitch = 1;
-    utterance.onend = () => setActivity("ready");
-    utterance.onerror = () => setActivity("ready");
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-    setVoiceProvider("browser");
-    setActivity("speaking");
+    const speak = () => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voice = pickBrowserVoice();
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      } else {
+        utterance.lang = "en-US";
+      }
+      utterance.rate = persona.voice.rate;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+      utterance.onend = () => setActivity("ready");
+      utterance.onerror = () => {
+        setNotice(
+          "Browser voice could not play. Unmute the speaker icon and check system sound.",
+        );
+        setActivity("ready");
+      };
+      window.speechSynthesis.cancel();
+      // Some browsers drop the first utterance right after cancel().
+      window.setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 40);
+      setVoiceProvider("browser");
+      setActivity("speaking");
+    };
+
+    // Chrome often loads voices asynchronously.
+    if (window.speechSynthesis.getVoices().length === 0) {
+      const onVoices = () => {
+        window.speechSynthesis.removeEventListener("voiceschanged", onVoices);
+        speak();
+      };
+      window.speechSynthesis.addEventListener("voiceschanged", onVoices);
+      window.setTimeout(() => {
+        window.speechSynthesis.removeEventListener("voiceschanged", onVoices);
+        speak();
+      }, 400);
+      return;
+    }
+
+    speak();
   }
 
   async function playBuyerReply(text: string) {
@@ -214,6 +270,12 @@ export function RoleplayStudio() {
       }
 
       const blob = await response.blob();
+      // Empty / header-only WAVs were previously returned as "success" and played silence.
+      if (blob.size < 512) {
+        speakWithBrowser(text);
+        return;
+      }
+
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
 
@@ -233,7 +295,13 @@ export function RoleplayStudio() {
         stopPlayback();
         speakWithBrowser(text);
       };
-      await audio.play();
+      try {
+        await audio.play();
+      } catch {
+        // Autoplay / user-gesture restrictions — fall back to browser TTS.
+        stopPlayback();
+        speakWithBrowser(text);
+      }
     } catch {
       stopPlayback();
       speakWithBrowser(text);

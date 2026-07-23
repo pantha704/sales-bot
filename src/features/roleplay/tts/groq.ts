@@ -50,6 +50,12 @@ export async function synthesizeWithGroq(
   });
   const audio = new Uint8Array(await response.arrayBuffer());
 
+  if (audio.byteLength < 256) {
+    throw new Error(
+      `Groq TTS returned empty audio (${audio.byteLength} bytes).`,
+    );
+  }
+
   return {
     audio,
     contentType: "audio/wav",

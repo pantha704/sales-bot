@@ -43,7 +43,14 @@ export async function synthesizeSpeech(
     }
 
     try {
-      return await providers[provider](input);
+      const result = await providers[provider](input);
+      // Guard against providers that "succeed" with a silent/empty payload.
+      if (!result.audio || result.audio.byteLength < 256) {
+        throw new Error(
+          `${provider} returned empty audio (${result.audio?.byteLength ?? 0} bytes).`,
+        );
+      }
+      return result;
     } catch (error) {
       lastError = error;
     }
