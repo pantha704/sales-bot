@@ -39,8 +39,9 @@ messages, and the roleplay has deterministic and browser-native fallbacks.
 - Next.js 16, React 19, TypeScript, Tailwind CSS, and shadcn/ui
 - Groq Whisper for speech-to-text
 - Groq-hosted Llama for the buyer conversation
-- Neuphonic TTS, with Groq Orpheus and browser speech fallbacks (empty cloud audio is treated as failure)
-- **Groq Orpheus note:** the org admin must accept model terms once in the [Groq console](https://console.groq.com/docs/text-to-speech/orpheus) or speech returns 503 and the UI falls back to browser voice
+- **Free buyer voice by default:** browser Web Speech API (`TTS_PROVIDER=browser`)
+- Optional cloud TTS: Neuphonic (`TTS_PROVIDER=neuphonic` + `NEXT_PUBLIC_CLOUD_TTS=1`)
+- Groq Orpheus TTS is **paid** and not used unless you explicitly set `TTS_PROVIDER=groq`
 - Zod validation at all external boundaries
 - n8n Cloud, Google Sheets, Gmail, and the Groq API
 - Vitest, ESLint, TypeScript, and a production-build CI gate
@@ -67,7 +68,7 @@ GROQ_TTS_VOICE=troy
 
 NEUPHONIC_API_KEY=
 NEUPHONIC_VOICE_ID=
-TTS_PROVIDER=neuphonic
+TTS_PROVIDER=browser
 
 # Both required for live leads (secret is fail-closed when URL is set).
 N8N_LEAD_WEBHOOK_URL=

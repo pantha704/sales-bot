@@ -90,7 +90,8 @@ n8n Cloud
 | `GROQ_TTS_VOICE` | No | If Groq TTS | — | Default `troy` |
 | `NEUPHONIC_API_KEY` | No | For primary TTS | — | Server-only |
 | `NEUPHONIC_VOICE_ID` | No | With Neuphonic | — | |
-| `TTS_PROVIDER` | No | Recommended | — | `neuphonic` \| `groq` |
+| `TTS_PROVIDER` | No | Recommended | — | `browser` (free default) \| `neuphonic` \| `groq` (paid) |
+| `NEXT_PUBLIC_CLOUD_TTS` | No | Only for cloud voice | — | `1` to call `/api/roleplay/speech` |
 | `N8N_LEAD_WEBHOOK_URL` | No | — | **Yes** (production URL) | Not the n8n *test* URL |
 | `N8N_WEBHOOK_SECRET` | No | — | **Yes in prod** | Must match n8n Header Auth |
 
@@ -137,7 +138,7 @@ npm run dev
 | ID | Task | Acceptance criteria |
 |----|------|---------------------|
 | B1 | Add `GROQ_API_KEY` (and model/voice) in Vercel Production | Roleplay shows **Live AI**, not Demo |
-| B2 | Add Neuphonic or set `TTS_PROVIDER=groq` | Speech route returns audio; browser fallback only on failure |
+| B2 | Prefer free `TTS_PROVIDER=browser`; optional Neuphonic if credits work | Buyer voice plays via browser; cloud only when opted in |
 | B3 | Import + **publish** n8n workflows from `workflows/` | Production webhook URL exists |
 | B4 | Set `N8N_LEAD_WEBHOOK_URL` + `N8N_WEBHOOK_SECRET` on Vercel Production only | Lead form returns `mode: "live"` |
 | B5 | Wire Google Sheet + Gmail credentials in n8n | One Sales + one OD sample each produce row + email |

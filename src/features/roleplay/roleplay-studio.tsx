@@ -224,10 +224,21 @@ export function RoleplayStudio() {
         setActivity("ready");
       };
       window.speechSynthesis.cancel();
+      // Chrome can stick in a paused state after cancel; resume before speak.
+      try {
+        window.speechSynthesis.resume();
+      } catch {
+        // ignore
+      }
       // Some browsers drop the first utterance right after cancel().
       window.setTimeout(() => {
+        try {
+          window.speechSynthesis.resume();
+        } catch {
+          // ignore
+        }
         window.speechSynthesis.speak(utterance);
-      }, 40);
+      }, 50);
       setVoiceProvider("browser");
       setActivity("speaking");
     };
@@ -256,6 +267,17 @@ export function RoleplayStudio() {
     }
 
     setActivity("speaking");
+
+    // Free default: browser Web Speech API (no paid Orpheus).
+    // Optional cloud: set NEXT_PUBLIC_CLOUD_TTS=1 and TTS_PROVIDER=neuphonic.
+    const preferCloud =
+      process.env.NEXT_PUBLIC_CLOUD_TTS === "1" ||
+      process.env.NEXT_PUBLIC_CLOUD_TTS === "true";
+
+    if (!preferCloud) {
+      speakWithBrowser(text);
+      return;
+    }
 
     try {
       const response = await fetch("/api/roleplay/speech", {

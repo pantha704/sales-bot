@@ -32,32 +32,23 @@ sequenceDiagram
 ```
 
 If Groq conversation generation fails, a deterministic in-character buyer
-answers and the interface labels the fallback. If cloud TTS fails (including
-empty/silent audio payloads), the sequence is Neuphonic → Groq Orpheus →
-browser speech. The UI badge shows which path played (`neuphonic`, `groq`, or
-`browser`). A cloud outage therefore does not make the demo unusable.
+answers and the interface labels the fallback.
+
+**Voice is free by default.** Buyer lines use the browser Web Speech API
+(`Voice: browser`). Paid Groq Orpheus is not used unless you opt in. Optional
+Neuphonic cloud TTS needs `TTS_PROVIDER=neuphonic` and `NEXT_PUBLIC_CLOUD_TTS=1`.
 
 ## Why this TTS stack
 
 | Option | License/cost shape | Assignment fit | Decision |
 |---|---|---|---|
-| Neuphonic hosted API | Hosted account allowance/usage pricing | Official Node SDK, short integration path, natural output | Primary |
-| Groq Orpheus | Hosted API with account rate limits | Reuses the Groq key; short-input constraint | Secondary |
-| Browser speech synthesis | Built into supported browsers | Free and no key, but OS/browser voice varies | Final fallback |
-| Qwen3-TTS | Apache-2.0 model; compute/hosting is separate | Strong and configurable, but requires a model service | Future option |
-| NeuTTS | Open on-device model; compute/hosting is separate | Private/local and CPU-capable, but adds Python/model deployment | Future option |
+| Browser speech synthesis | Free, built into browsers | No key; works for the assignment demo | **Default** |
+| Neuphonic hosted API | Free/paid hosted tiers | Cloud voice when credits work | Optional |
+| Groq Orpheus | **Paid** usage | Only if explicitly enabled | Opt-in only |
+| Qwen3-TTS / NeuTTS | Open models; you host compute | Future self-host option | Future |
 
-“Open source” means the model can be used under its license; it does **not**
-mean inference hosting, memory, bandwidth, or an always-on endpoint is free.
-Qwen/NeuTTS become attractive after the assignment if an always-on machine is
-available and privacy or voice ownership outweighs deployment simplicity.
-
-Groq Orpheus requires a one-time terms acceptance by the org admin in the
-[Groq console](https://console.groq.com/docs/text-to-speech/orpheus). Until that
-is done, Orpheus returns 400 and the app falls through to browser speech.
-
-The primary provider is selected with `TTS_PROVIDER=neuphonic`. Changing it to
-`groq` reverses the first two attempts without changing UI code.
+Default: `TTS_PROVIDER=browser`. Groq remains for free-tier chat/STT; buyer
+voice does not depend on paid Orpheus.
 
 ## Persona configuration
 

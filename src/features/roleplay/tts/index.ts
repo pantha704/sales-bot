@@ -16,18 +16,35 @@ export class TtsUnavailableError extends Error {
   }
 }
 
+function providerOrder(
+  preferred: "browser" | "neuphonic" | "groq",
+): TtsProviderName[] {
+  // Default free path: no paid Orpheus. Groq TTS only when explicitly chosen.
+  if (preferred === "browser") {
+    return [];
+  }
+  if (preferred === "neuphonic") {
+    return ["neuphonic"];
+  }
+  return ["groq", "neuphonic"];
+}
+
 export async function synthesizeSpeech(
   input: SynthesisInput,
 ): Promise<SynthesisResult> {
   const env = getServerEnv();
+
+  if (env.TTS_PROVIDER === "browser") {
+    throw new TtsUnavailableError(
+      "Cloud TTS is disabled (TTS_PROVIDER=browser). Use free browser speech.",
+    );
+  }
+
   const configured = {
     neuphonic: Boolean(env.NEUPHONIC_API_KEY),
-    groq: Boolean(env.GROQ_API_KEY),
+    groq: Boolean(env.GROQ_API_KEY) && env.TTS_PROVIDER === "groq",
   } satisfies Record<TtsProviderName, boolean>;
-  const order: TtsProviderName[] =
-    env.TTS_PROVIDER === "neuphonic"
-      ? ["neuphonic", "groq"]
-      : ["groq", "neuphonic"];
+  const order = providerOrder(env.TTS_PROVIDER);
   const providers = {
     neuphonic: synthesizeWithNeuphonic,
     groq: synthesizeWithGroq,
@@ -65,5 +82,7 @@ export async function synthesizeSpeech(
     );
   }
 
-  throw new TtsUnavailableError();
+  throw new TtsUnavailableError(
+    "No free cloud TTS is configured. Use browser speech (default).",
+  );
 }

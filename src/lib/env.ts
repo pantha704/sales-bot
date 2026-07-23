@@ -20,7 +20,12 @@ const serverEnvSchema = z.object({
   GROQ_TTS_VOICE: z.string().min(1).default("troy"),
   NEUPHONIC_API_KEY: optionalString,
   NEUPHONIC_VOICE_ID: optionalString,
-  TTS_PROVIDER: z.enum(["neuphonic", "groq"]).default("neuphonic"),
+  /**
+   * browser = free Web Speech API (client-side; speech route returns 503)
+   * neuphonic = optional free/paid Neuphonic cloud TTS
+   * groq = paid Orpheus (disabled unless explicitly selected)
+   */
+  TTS_PROVIDER: z.enum(["browser", "neuphonic", "groq"]).default("browser"),
   N8N_LEAD_WEBHOOK_URL: optionalUrl,
   N8N_WEBHOOK_SECRET: optionalString,
   UPSTASH_REDIS_REST_URL: optionalUrl,
@@ -101,6 +106,7 @@ export function getProviderAvailability() {
   return {
     groq: Boolean(env.GROQ_API_KEY),
     neuphonic: Boolean(env.NEUPHONIC_API_KEY),
+    ttsProvider: env.TTS_PROVIDER,
     n8n: Boolean(env.N8N_LEAD_WEBHOOK_URL && env.N8N_WEBHOOK_SECRET),
     mockMode: !env.GROQ_API_KEY,
     rateLimitBackend: upstashReady ? ("upstash" as const) : ("memory" as const),
