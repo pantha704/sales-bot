@@ -146,7 +146,43 @@ export function RoleplayStudio() {
     [setDraft],
   );
 
-  const dictation = useSpeechDictation({ onTranscript: applyDictation });
+  const startWhisperRecording = useCallback(async () => {
+    setError(null);
+    try {
+      await recorder.startRecording();
+      setNotice(
+        "Recording with server transcription… speak, then tap the mic to stop. Text will appear in the box.",
+      );
+    } catch {
+      // Recorder hook surfaces permission errors.
+    }
+  }, [recorder]);
+
+  const handleDictationFatalError = useCallback(
+    (code: string) => {
+      // Browser STT talks to Google/Microsoft cloud — often blocked on Linux/VPN.
+      // Fall back to MediaRecorder → Groq Whisper (our API).
+      if (
+        code === "network" ||
+        code === "service-not-allowed" ||
+        code === "not-supported" ||
+        code === "start-failed" ||
+        code === "audio-capture"
+      ) {
+        setError(null);
+        setNotice(
+          "Browser live dictation unavailable here — switching to server transcription. Speak, then tap mic to stop.",
+        );
+        void startWhisperRecording();
+      }
+    },
+    [startWhisperRecording],
+  );
+
+  const dictation = useSpeechDictation({
+    onTranscript: applyDictation,
+    onFatalError: handleDictationFatalError,
+  });
   const isListening =
     dictation.isListening || recorder.isRecording;
   const sellerTurnCount = messages.filter(
@@ -540,9 +576,11 @@ export function RoleplayStudio() {
 
     setError(null);
     setNotice(null);
+    dictation.clearError();
     stopPlayback();
 
-    // Prefer live browser STT into the text field (no Groq round-trip).
+    // Prefer live browser STT when available. On network/VPN failures the hook
+    // auto-falls back to MediaRecorder → Groq Whisper via onFatalError.
     if (dictation.supported) {
       dictationBaseRef.current = draft.trim().slice(0, 1_200);
       try {
@@ -551,20 +589,12 @@ export function RoleplayStudio() {
           "Listening… speak now. Words appear in the box. Tap the mic again to stop, then send.",
         );
       } catch {
-        // Hook sets the error message.
+        // Hook sets error + onFatalError may start Whisper recording.
       }
       return;
     }
 
-    // Fallback: record blob → Groq Whisper → fill the text field.
-    try {
-      await recorder.startRecording();
-      setNotice(
-        "Recording… tap stop when finished. Audio will be transcribed into the box.",
-      );
-    } catch {
-      // The recorder hook presents the actionable permission error.
-    }
+    await startWhisperRecording();
   }
 
   function downloadTranscript() {
@@ -1092,11 +1122,18 @@ export function RoleplayStudio() {
           )}
 
           <div className="mx-auto w-full max-w-3xl space-y-3 border-t border-border/70 pt-4">
-            {error || recorder.error || dictation.error ? (
+            {error ||
+            recorder.error ||
+            (dictation.error &&
+              !recorder.isRecording &&
+              dictation.lastErrorCode !== "network" &&
+              dictation.lastErrorCode !== "service-not-allowed") ? (
               <Alert variant="destructive">
                 <AlertCircle aria-hidden="true" />
                 <AlertDescription>
-                  {error ?? recorder.error ?? dictation.error}
+                  {error ??
+                    recorder.error ??
+                    dictation.error}
                 </AlertDescription>
               </Alert>
             ) : notice ? (

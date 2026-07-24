@@ -48,23 +48,32 @@ export function isBrowserSpeechDictationSupported() {
 
 /**
  * Live browser speech-to-text into a text field (Chrome/Edge/Safari).
- * Does not require Groq — text appears as you speak.
+ * Uses the browser vendor cloud STT (e.g. Google in Chromium) — not our API.
+ * Network/VPN/firewall blocks often surface as error code "network".
  */
 export function useSpeechDictation(options: {
   onTranscript: (text: string, meta: { isFinal: boolean }) => void;
+  /** Called for fatal recognition errors so the UI can fall back (e.g. Whisper). */
+  onFatalError?: (code: string, message: string) => void;
   lang?: string;
 }) {
-  const { onTranscript, lang = "en-US" } = options;
+  const { onTranscript, onFatalError, lang = "en-US" } = options;
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const intentionalStopRef = useRef(false);
   const onTranscriptRef = useRef(onTranscript);
+  const onFatalErrorRef = useRef(onFatalError);
   const [status, setStatus] = useState<DictationStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [lastErrorCode, setLastErrorCode] = useState<string | null>(null);
   const supported = isBrowserSpeechDictationSupported();
 
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
+
+  useEffect(() => {
+    onFatalErrorRef.current = onFatalError;
+  }, [onFatalError]);
 
   const stop = useCallback(() => {
     intentionalStopRef.current = true;
@@ -82,12 +91,15 @@ export function useSpeechDictation(options: {
 
   const start = useCallback(() => {
     setError(null);
+    setLastErrorCode(null);
     const Ctor = getSpeechRecognitionConstructor();
     if (!Ctor) {
       const message =
         "Live dictation is not supported in this browser. Use Chrome/Edge, or type your message.";
       setError(message);
+      setLastErrorCode("not-supported");
       setStatus("error");
+      onFatalErrorRef.current?.("not-supported", message);
       throw new Error(message);
     }
 
@@ -141,15 +153,20 @@ export function useSpeechDictation(options: {
         return;
       }
 
+      const code = event.error || "unknown";
       const message =
-        event.error === "not-allowed"
+        code === "not-allowed"
           ? "Microphone permission was denied."
-          : event.error === "network"
-            ? "Speech recognition network error. Check connectivity or type instead."
-            : `Speech recognition error: ${event.error}`;
+          : code === "network"
+            ? "Browser live dictation could not reach the speech service (VPN/firewall/offline). Falling back to server transcription if available."
+            : code === "service-not-allowed"
+              ? "Browser speech service is blocked on this device."
+              : `Speech recognition error: ${code}`;
+      setLastErrorCode(code);
       setError(message);
       setStatus("error");
       recognitionRef.current = null;
+      onFatalErrorRef.current?.(code, message);
     };
 
     recognition.onend = () => {
@@ -177,13 +194,16 @@ export function useSpeechDictation(options: {
           ? cause.message
           : "Could not start live dictation.";
       setError(message);
+      setLastErrorCode("start-failed");
       setStatus("error");
+      onFatalErrorRef.current?.("start-failed", message);
       throw new Error(message, { cause });
     }
   }, [lang]);
 
   const clearError = useCallback(() => {
     setError(null);
+    setLastErrorCode(null);
     setStatus("idle");
   }, []);
 
@@ -204,6 +224,7 @@ export function useSpeechDictation(options: {
     supported,
     status,
     error,
+    lastErrorCode,
     isListening: status === "listening",
     start,
     stop,
