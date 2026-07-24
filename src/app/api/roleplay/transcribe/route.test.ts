@@ -37,4 +37,27 @@ describe("POST /api/roleplay/transcribe", () => {
     expect(response.status).toBe(503);
     expect(body.code).toBe("TRANSCRIPTION_UNAVAILABLE");
   });
+
+  it("accepts browser MediaRecorder MIME with codecs parameter", async () => {
+    vi.stubEnv("GROQ_API_KEY", "");
+    const formData = new FormData();
+    formData.set(
+      "audio",
+      new File([new Uint8Array([1, 2, 3])], "seller-message.webm", {
+        type: "audio/webm;codecs=opus",
+      }),
+    );
+    const response = await POST(
+      new Request("http://localhost/api/roleplay/transcribe", {
+        method: "POST",
+        body: formData,
+      }),
+    );
+    const body = await response.json();
+
+    // Should pass MIME validation and only fail on missing Groq key.
+    expect(response.status).toBe(503);
+    expect(body.code).toBe("TRANSCRIPTION_UNAVAILABLE");
+    expect(body.error).not.toMatch(/WebM, WAV/i);
+  });
 });

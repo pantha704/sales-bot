@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  FormEvent,
+  KeyboardEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -44,6 +51,7 @@ import {
   type ScoreResponse,
 } from "@/features/roleplay/scoring/schemas";
 import { useAudioRecorder } from "@/features/roleplay/use-audio-recorder";
+import { useSpeechDictation } from "@/features/roleplay/use-speech-dictation";
 import { cn } from "@/lib/utils";
 
 type Activity =
@@ -114,15 +122,36 @@ export function RoleplayStudio() {
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  /** Text committed before/during dictation (excludes live interim words). */
+  const dictationBaseRef = useRef("");
   const recorder = useAudioRecorder();
+
+  const applyDictation = useCallback(
+    (text: string, meta: { isFinal: boolean }) => {
+      const piece = text.trim();
+      if (!piece) return;
+
+      if (meta.isFinal) {
+        const base = dictationBaseRef.current.trimEnd();
+        const next = base ? `${base} ${piece}` : piece;
+        dictationBaseRef.current = next.slice(0, 1_200);
+        setDraft(dictationBaseRef.current);
+        return;
+      }
+
+      const base = dictationBaseRef.current.trimEnd();
+      const next = base ? `${base} ${piece}` : piece;
+      setDraft(next.slice(0, 1_200));
+    },
+    [setDraft],
+  );
+
+  const dictation = useSpeechDictation({ onTranscript: applyDictation });
+  const isListening =
+    dictation.isListening || recorder.isRecording;
   const sellerTurnCount = messages.filter(
     (message) => message.role === "seller",
   ).length;
-  const canScore =
-    sellerTurnCount >= MIN_SELLER_TURNS_TO_SCORE &&
-    !isScoring &&
-    !recorder.isRecording &&
-    !scoreViewOpen;
   const chatLocked = scoreViewOpen || isScoring;
   const isBusy =
     activity !== "ready" ||
@@ -158,6 +187,13 @@ export function RoleplayStudio() {
 
   function resetSession(nextPersona = persona) {
     stopPlayback();
+    if (dictation.isListening) {
+      dictation.stop();
+    }
+    if (recorder.isRecording) {
+      void recorder.stopRecording().catch(() => undefined);
+    }
+    dictationBaseRef.current = "";
     setSessionId(crypto.randomUUID());
     setMessages(initialMessages(nextPersona));
     setDraft("");
@@ -170,6 +206,7 @@ export function RoleplayStudio() {
     setIsScoring(false);
     setActivity("ready");
     recorder.clearError();
+    dictation.clearError();
   }
 
   function changePersona(nextId: string) {
@@ -408,16 +445,41 @@ export function RoleplayStudio() {
     }
   }
 
+  function audioUploadMeta(blob: Blob) {
+    const raw = (blob.type || "audio/webm").toLowerCase();
+    const base = raw.split(";")[0]?.trim() || "audio/webm";
+    const extension = base.includes("mp4") || base.includes("m4a")
+      ? "mp4"
+      : base.includes("ogg")
+        ? "ogg"
+        : base.includes("wav")
+          ? "wav"
+          : base.includes("mpeg") || base.includes("mp3")
+            ? "mp3"
+            : "webm";
+    const contentType =
+      extension === "mp4"
+        ? "audio/mp4"
+        : extension === "ogg"
+          ? "audio/ogg"
+          : extension === "wav"
+            ? "audio/wav"
+            : extension === "mp3"
+              ? "audio/mpeg"
+              : "audio/webm";
+    return { extension, contentType };
+  }
+
   async function transcribeRecording(blob: Blob) {
     setActivity("transcribing");
     setError(null);
     const formData = new FormData();
-    const extension = blob.type.includes("mp4")
-      ? "mp4"
-      : blob.type.includes("ogg")
-        ? "ogg"
-        : "webm";
-    formData.set("audio", blob, `seller-message.${extension}`);
+    const { extension, contentType } = audioUploadMeta(blob);
+    // Re-wrap so the server receives a clean base MIME (not codecs=opus).
+    const file = new File([blob], `seller-message.${extension}`, {
+      type: contentType,
+    });
+    formData.set("audio", file);
 
     try {
       const response = await fetch("/api/roleplay/transcribe", {
@@ -436,8 +498,12 @@ export function RoleplayStudio() {
         );
       }
 
+      // Put text in the field so you can edit before sending (same as live STT).
+      const next = body.text.trim().slice(0, 1_200);
+      dictationBaseRef.current = next;
+      setDraft(next);
       setActivity("ready");
-      await sendSellerMessage(body.text, true);
+      setNotice("Transcribed into the box — edit if needed, then send.");
     } catch (cause) {
       setActivity("ready");
       setError(
@@ -449,6 +515,15 @@ export function RoleplayStudio() {
   }
 
   async function handleMicrophone() {
+    // Stop live browser dictation.
+    if (dictation.isListening) {
+      dictation.stop();
+      dictationBaseRef.current = draft.trim().slice(0, 1_200);
+      setNotice("Dictation stopped — edit the text and send when ready.");
+      return;
+    }
+
+    // Stop MediaRecorder fallback and Whisper-transcribe into the field.
     if (recorder.isRecording) {
       try {
         const recording = await recorder.stopRecording();
@@ -463,8 +538,30 @@ export function RoleplayStudio() {
       return;
     }
 
+    setError(null);
+    setNotice(null);
+    stopPlayback();
+
+    // Prefer live browser STT into the text field (no Groq round-trip).
+    if (dictation.supported) {
+      dictationBaseRef.current = draft.trim().slice(0, 1_200);
+      try {
+        dictation.start();
+        setNotice(
+          "Listening… speak now. Words appear in the box. Tap the mic again to stop, then send.",
+        );
+      } catch {
+        // Hook sets the error message.
+      }
+      return;
+    }
+
+    // Fallback: record blob → Groq Whisper → fill the text field.
     try {
       await recorder.startRecording();
+      setNotice(
+        "Recording… tap stop when finished. Audio will be transcribed into the box.",
+      );
     } catch {
       // The recorder hook presents the actionable permission error.
     }
@@ -765,7 +862,7 @@ export function RoleplayStudio() {
                 onClick={() => void scoreCall()}
                 disabled={
                   isScoring ||
-                  recorder.isRecording ||
+                  isListening ||
                   (sellerTurnCount < MIN_SELLER_TURNS_TO_SCORE && !score) ||
                   (activity !== "ready" && !score)
                 }
@@ -995,11 +1092,11 @@ export function RoleplayStudio() {
           )}
 
           <div className="mx-auto w-full max-w-3xl space-y-3 border-t border-border/70 pt-4">
-            {error || recorder.error ? (
+            {error || recorder.error || dictation.error ? (
               <Alert variant="destructive">
                 <AlertCircle aria-hidden="true" />
                 <AlertDescription>
-                  {error ?? recorder.error}
+                  {error ?? recorder.error ?? dictation.error}
                 </AlertDescription>
               </Alert>
             ) : notice ? (
@@ -1012,14 +1109,23 @@ export function RoleplayStudio() {
             <form onSubmit={handleSubmit} className="relative">
               <Textarea
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setDraft(value);
+                  // Keep dictation base in sync if user edits while not interim-only.
+                  if (!dictation.isListening) {
+                    dictationBaseRef.current = value;
+                  }
+                }}
                 onKeyDown={handleDraftKeyDown}
                 placeholder={
                   scoreViewOpen
                     ? "Score card open — go back to chat to keep selling…"
-                    : recorder.isRecording
-                      ? "Listening… tap stop when you finish"
-                      : "Ask a discovery question or present your value proposition…"
+                    : dictation.isListening
+                      ? "Listening… your words appear here live"
+                      : recorder.isRecording
+                        ? "Recording… tap stop when you finish"
+                        : "Ask a discovery question or present your value proposition…"
                 }
                 className="min-h-24 resize-none bg-background/55 pr-24 pb-11 leading-6"
                 maxLength={1_200}
@@ -1030,18 +1136,18 @@ export function RoleplayStudio() {
                 <Button
                   type="button"
                   size="icon"
-                  variant={recorder.isRecording ? "destructive" : "outline"}
+                  variant={isListening ? "destructive" : "outline"}
                   onClick={handleMicrophone}
                   disabled={isBusy || scoreViewOpen}
                   aria-label={
-                    recorder.isRecording ? "Stop recording" : "Record message"
+                    isListening ? "Stop listening" : "Dictate into message"
                   }
                   className={cn(
-                    recorder.isRecording &&
+                    isListening &&
                       "animate-pulse ring-4 ring-destructive/15",
                   )}
                 >
-                  {recorder.isRecording ? (
+                  {isListening ? (
                     <Square className="fill-current" aria-hidden="true" />
                   ) : (
                     <Mic aria-hidden="true" />
@@ -1053,12 +1159,12 @@ export function RoleplayStudio() {
                   disabled={
                     !draft.trim() ||
                     isBusy ||
-                    recorder.isRecording ||
+                    isListening ||
                     scoreViewOpen
                   }
                   aria-label="Send message"
                 >
-                  {isBusy && !recorder.isRecording ? (
+                  {isBusy && !isListening ? (
                     <LoaderCircle className="animate-spin" aria-hidden="true" />
                   ) : (
                     <Send aria-hidden="true" />
@@ -1066,10 +1172,15 @@ export function RoleplayStudio() {
                 </Button>
               </div>
               <div className="pointer-events-none absolute bottom-3 left-3 flex items-center gap-2 text-[0.68rem] text-muted-foreground">
-                {recorder.isRecording ? (
+                {dictation.isListening ? (
                   <>
                     <span className="size-2 animate-pulse rounded-full bg-red-400" />
-                    Recording
+                    Live dictation
+                  </>
+                ) : recorder.isRecording ? (
+                  <>
+                    <span className="size-2 animate-pulse rounded-full bg-red-400" />
+                    Recording for Whisper
                   </>
                 ) : (
                   <>
