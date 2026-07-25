@@ -1,6 +1,6 @@
 # CloseLoop
 
-**Eubrics Automation Engineer assignment** — one GitHub repo covering Parts 1–3.
+**Eubrics Automation Engineer assignment** — one GitHub repo covering Parts 1–2.
 
 | | |
 |---|---|
@@ -14,7 +14,6 @@
 1. Open the live demo (or run locally with `npm install && npm run dev`).
 2. **Part 1 — Roleplay:** `/roleplay` — talk or type to an AI buyer, switch personas, hear free neural voice, download transcript, score the call.
 3. **Part 2 — Leads:** `/lead-profiler` — submit a lead; with n8n configured it classifies → Google Sheet → Gmail; without keys it returns a labelled demo classification.
-4. **Part 3 — Case study:** [docs/part-3-automation.md](docs/part-3-automation.md) — sanitized monday.com → Outlook operations automation (not a separate deployable app).
 
 ### AI tools & keys used (disclosure)
 
@@ -36,7 +35,6 @@ Full iteration notes: [docs/ai-iteration-log.md](docs/ai-iteration-log.md).
 |---|---|---|
 | **1** Roleplay voice bot | Configurable AI buyer, free TTS, transcript + score | [docs/part-1-roleplay.md](docs/part-1-roleplay.md) |
 | **2** Lead profiler | Form → n8n → classify → Sheet → email | [docs/part-2-n8n.md](docs/part-2-n8n.md) |
-| **3** Existing automation | monday.com status change → Outlook notify | [docs/part-3-automation.md](docs/part-3-automation.md) |
 
 Demo / submission checklist: [docs/demo-checklist.md](docs/demo-checklist.md).
 
@@ -205,28 +203,6 @@ Node-by-node rebuild guide, sample payloads, test matrix, production limits:
 
 ---
 
-## Part 3 — Existing automation case study
-
-### Short
-
-Sanitized write-up of a real operations automation: **monday.com status change → validate fields → compose message → Outlook email → record notification state** to reduce duplicates.
-
-There is no separate app to deploy for Part 3. Reviewers should read the doc; if a live recreation is unavailable, the Part 2 n8n flow is the runnable automation demonstration in this repo.
-
-### Setup / .env
-
-None in this repository. Part 3 is documentation only (employer data, board IDs, and credentials intentionally excluded).
-
-### AI tools for Part 3
-
-None required to understand the design. The case study is human-documented architecture (trigger, conditions, actions, reliability choices).
-
-### Deep dive
-
-[docs/part-3-automation.md](docs/part-3-automation.md)
-
----
-
 ## Repository map
 
 ```text
@@ -297,7 +273,7 @@ Include:
 
 - This repo: https://github.com/pantha704/sales-bot  
 - Hosted app: https://sales-bot-sooty.vercel.app  
-- Part 1 / 2 / 3 demo videos or Loom if you record them  
+- Part 1 / 2 demo videos or Loom if you record them  
 - Any credentials only if you gate the demo (this deploy does not need login)
 
 Questions: `maxim@eubrics.com`
