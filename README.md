@@ -2,12 +2,18 @@
 
 Sales practice and lead automation in one app — AI buyer roleplay with voice, plus form-to-Sheet-to-email lead profiling.
 
-**[Live demo](https://sales-bot-sooty.vercel.app)** · no login · works without API keys in **Demo mode**
+| | |
+|---|---|
+| **Live demo** | [https://sales-bot-sooty.vercel.app](https://sales-bot-sooty.vercel.app) |
+| **Repository** | [https://github.com/pantha704/sales-bot](https://github.com/pantha704/sales-bot) |
+| **Login** | None — open the URL and use either flow |
+| **Keys required?** | No. Without credentials the app runs in labelled **Demo mode** |
 
-| Flow | Path | What it does |
-|---|---|---|
-| **Roleplay** | [`/roleplay`](https://sales-bot-sooty.vercel.app/roleplay) | Talk or type with an AI buyer, switch personas, hear neural voice, download transcript, score the call |
-| **Lead profiler** | [`/lead-profiler`](https://sales-bot-sooty.vercel.app/lead-profiler) | Submit a lead → classify → Google Sheet + Gmail (or labelled demo when n8n is not configured) |
+### What you get in 30 seconds
+
+1. Open the live demo (or run locally with `npm install && npm run dev`).
+2. **Roleplay:** `/roleplay` — talk or type to an AI buyer, switch personas, hear free neural voice, download transcript, score the call.
+3. **Leads:** `/lead-profiler` — submit a lead; with n8n configured it classifies → Google Sheet → Gmail; without keys it returns a labelled demo classification.
 
 Guides: [Roleplay](docs/part-1-roleplay.md) · [Lead profiler / n8n](docs/part-2-n8n.md)
 
