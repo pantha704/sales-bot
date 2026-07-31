@@ -1,0 +1,111 @@
+{
+  "name": "Starter - Public Hello API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "hello",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -320,
+        0
+      ],
+      "id": "50959c1b-faad-4ea4-b8f9-f1e70b9f3892",
+      "name": "GET /hello",
+      "webhookId": "de0bcb5f-a133-4035-8a43-87dd6332b0e1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aa2f45e9-7f57-4a7e-941d-5b9112167533",
+              "name": "success",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "e7dd0862-3e4f-4f72-b221-ad3f23160800",
+              "name": "message",
+              "value": "={{ $json.query.name ? 'Hello, ' + $json.query.name + '!' : 'Hello from your n8n VPS!' }}",
+              "type": "string"
+            },
+            {
+              "id": "f9a55ed0-b3c3-44cd-8511-b196b57b0677",
+              "name": "serverTime",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "453d8319-35ef-4206-93ee-c0c9d7f419bc",
+              "name": "workflow",
+              "value": "Starter - Public Hello API",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        0
+      ],
+      "id": "d94f54c6-b520-40aa-95a8-6afbc99da73a",
+      "name": "Build Response"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        160,
+        0
+      ],
+      "id": "e05cac99-9b48-4313-8b8b-485aff92e2e8",
+      "name": "Return JSON"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "GET /hello": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Return JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c47ae18b-fea8-47a5-b527-f9f6c5880fef",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
